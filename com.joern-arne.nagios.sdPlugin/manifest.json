@@ -1,10 +1,10 @@
 {
-	"Name": "Nagios Status",
+	"Name": "Status Monitor for Nagios",
 	"Version": "0.1.0.0",
 	"Author": "Joern-Arne",
 	"Actions": [
 		{
-			"Name": "Nagios Status",
+			"Name": "Status Monitor",
 			"UUID": "com.joern-arne.nagios.status",
 			"Icon": "imgs/actions/status/icon",
 			"Tooltip": "Displays Nagios host or service status.",
@@ -20,7 +20,7 @@
 			]
 		}
 	],
-	"Category": "Nagios Status",
+	"Category": "Status Monitor for Nagios",
 	"CategoryIcon": "imgs/plugin/category-icon",
 	"CodePath": "bin/plugin.js",
 	"Description": "Show Nagios host and service status on buttons",
