@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <title>Nagios Status Settings</title>
+    <meta charset="utf-8" />
+    <script src="https://sdpi-components.dev/releases/v4/sdpi-components.js"></script>
+    <style>
+        body {
+            background-color: #2D2D2D;
+            color: #D8D8D8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 11px;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .form-control {
+            width: 100%;
+            height: 28px;
+            background-color: #1A1A1A;
+            color: #EFEFEF;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 4px 8px;
+            box-sizing: border-box;
+            font-size: 11px;
+        }
+        .form-control:focus {
+            border-color: #0078D4;
+            outline: none;
+        }
+        .btn {
+            height: 28px;
+            background-color: #0078D4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0 16px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .btn:hover {
+            background-color: #0086F0;
+        }
+        .btn-secondary {
+            background-color: #444;
+            color: #CCC;
+        }
+        .btn-secondary:hover {
+            background-color: #555;
+            color: #FFF;
+        }
+        .error-msg {
+            color: #FF5252;
+            font-weight: 500;
+            margin-top: 6px;
+            display: none;
+            text-align: center;
+        }
+        .loading-container {
+            text-align: center;
+            padding: 20px 0;
+            display: none;
+        }
+        .spinner {
+            border: 3px solid #444;
+            border-top: 3px solid #0078D4;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .info-bar {
+            background-color: #1A1A1A;
+            border: 1px solid #3C3C3C;
+            border-radius: 4px;
+            padding: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading overlay -->
+    <div id="loading-view" class="loading-container">
+        <div class="spinner"></div>
+        <span id="loading-text">Connecting to Nagios...</span>
+    </div>
+
+    <!-- Login/Connection View -->
+    <div id="login-view" style="display: none;">
+        <sdpi-item label="Nagios URL">
+            <input type="text" id="url-input" class="form-control" placeholder="http://nagios-server/nagios" />
+        </sdpi-item>
+        <sdpi-item label="Username">
+            <input type="text" id="username-input" class="form-control" placeholder="nagiosadmin" />
+        </sdpi-item>
+        <sdpi-item label="Password">
+            <input type="password" id="password-input" class="form-control" />
+        </sdpi-item>
+        <div style="text-align: right; margin-top: 15px; padding-right: 15px;">
+            <button id="connect-btn" class="btn">Connect</button>
+        </div>
+        <div id="conn-error" class="error-msg"></div>
+    </div>
+
+    <!-- Settings/Configuration View -->
+    <div id="settings-view" style="display: none;">
+        <div class="info-bar">
+            <span id="server-label" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 140px; font-weight: bold;">Connected</span>
+            <button id="disconnect-btn" class="btn btn-secondary" style="height: 20px; padding: 0 8px; font-size: 10px;">Change Server</button>
+        </div>
+        
+        <sdpi-item label="Type">
+            <select id="entity-type-select" class="form-control">
+                <option value="host">Host</option>
+                <option value="service">Service</option>
+                <option value="host_totals">Host Totals</option>
+                <option value="service_totals">Service Totals</option>
+            </select>
+        </sdpi-item>
+
+        <sdpi-item label="Host" id="host-item">
+            <select id="host-select" class="form-control">
+                <option value="">-- Select Host --</option>
+            </select>
+        </sdpi-item>
+
+        <sdpi-item label="Service" id="service-item" style="display: none;">
+            <select id="service-select" class="form-control">
+                <option value="">-- Select Service --</option>
+            </select>
+        </sdpi-item>
+
+        <sdpi-item label="Hostgroup" id="hostgroup-item" style="display: none;">
+            <select id="hostgroup-select" class="form-control">
+                <option value="">-- All Hostgroups --</option>
+            </select>
+        </sdpi-item>
+
+        <sdpi-item label="Servicegroup" id="servicegroup-item" style="display: none;">
+            <select id="servicegroup-select" class="form-control">
+                <option value="">-- All Servicegroups --</option>
+            </select>
+        </sdpi-item>
+
+        <sdpi-item label="Warn Threshold (%)" id="warn-threshold-item" style="display: none;">
+            <input type="number" id="warn-threshold-input" class="form-control" min="0" max="100" step="0.1" placeholder="99.0" />
+        </sdpi-item>
+
+        <sdpi-item label="Crit Threshold (%)" id="crit-threshold-item" style="display: none;">
+            <input type="number" id="crit-threshold-input" class="form-control" min="0" max="100" step="0.1" placeholder="98.0" />
+        </sdpi-item>
+
+        <sdpi-item label="Poll Interval">
+            <select id="interval-select" class="form-control">
+                <option value="10">10 seconds</option>
+                <option value="30">30 seconds</option>
+                <option value="60">1 minute</option>
+                <option value="300">5 minutes</option>
+            </select>
+        </sdpi-item>
+        
+        <div id="fetch-error" class="error-msg"></div>
+    </div>
+
+    <script>
+        const { streamDeckClient } = SDPIComponents;
+        
+        // DOM Elements
+        const loadingView = document.getElementById('loading-view');
+        const loadingText = document.getElementById('loading-text');
+        const loginView = document.getElementById('login-view');
+        const settingsView = document.getElementById('settings-view');
+        
+        const urlInput = document.getElementById('url-input');
+        const usernameInput = document.getElementById('username-input');
+        const passwordInput = document.getElementById('password-input');
+        const connectBtn = document.getElementById('connect-btn');
+        const connError = document.getElementById('conn-error');
+        
+        const serverLabel = document.getElementById('server-label');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const entityTypeSelect = document.getElementById('entity-type-select');
+        const hostItem = document.getElementById('host-item');
+        const hostSelect = document.getElementById('host-select');
+        const serviceSelect = document.getElementById('service-select');
+        const serviceItem = document.getElementById('service-item');
+        const hostgroupItem = document.getElementById('hostgroup-item');
+        const hostgroupSelect = document.getElementById('hostgroup-select');
+        const servicegroupItem = document.getElementById('servicegroup-item');
+        const servicegroupSelect = document.getElementById('servicegroup-select');
+        const warnThresholdItem = document.getElementById('warn-threshold-item');
+        const critThresholdItem = document.getElementById('crit-threshold-item');
+        const warnThresholdInput = document.getElementById('warn-threshold-input');
+        const critThresholdInput = document.getElementById('crit-threshold-input');
+        const intervalSelect = document.getElementById('interval-select');
+        const fetchError = document.getElementById('fetch-error');
+        
+        let globalHostNames = [];
+        let globalHostServiceMap = {};
+        let globalHostgroups = [];
+        let globalServicegroups = [];
+        let activeSettings = {};
+
+        // Helper to show/hide views
+        function showView(viewId) {
+            loadingView.style.display = viewId === 'loading' ? 'block' : 'none';
+            loginView.style.display = viewId === 'login' ? 'block' : 'none';
+            settingsView.style.display = viewId === 'settings' ? 'block' : 'none';
+        }
+
+        // Initialize connection status when SD is ready
+        streamDeckClient.sendToPropertyInspector.subscribe((event) => {
+            const payload = (event && event.payload) ? event.payload : event;
+            if (!payload || !payload.event) return;
+
+            if (payload.event === 'connected') {
+                globalHostNames = payload.hostNames || [];
+                globalHostServiceMap = payload.hostServiceMap || {};
+                globalHostgroups = payload.hostgroups || [];
+                globalServicegroups = payload.servicegroups || [];
+                
+                const url = urlInput.value.trim();
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+                
+                updateActionSettings({
+                    url,
+                    username,
+                    password
+                }).then(() => {
+                    setupSettingsForm();
+                    showView('settings');
+                });
+            } 
+            
+            else if (payload.event === 'connection_failed') {
+                showView('login');
+                connError.textContent = payload.error || "Connection failed";
+                connError.style.display = 'block';
+            } 
+            
+            else if (payload.event === 'hosts_services_list') {
+                globalHostNames = payload.hostNames || [];
+                globalHostServiceMap = payload.hostServiceMap || {};
+                globalHostgroups = payload.hostgroups || [];
+                globalServicegroups = payload.servicegroups || [];
+                
+                if (payload.credentials) {
+                    urlInput.value = payload.credentials.url || '';
+                    usernameInput.value = payload.credentials.username || '';
+                    passwordInput.value = payload.credentials.password || '';
+                    
+                    if (!activeSettings.url) {
+                        updateActionSettings({
+                            url: payload.credentials.url,
+                            username: payload.credentials.username,
+                            password: payload.credentials.password
+                        });
+                    }
+                }
+                
+                setupSettingsForm();
+                showView('settings');
+            } 
+            
+            else if (payload.event === 'not_logged_in') {
+                streamDeckClient.getGlobalSettings().then((globalSettings) => {
+                    if (globalSettings.url) {
+                        urlInput.value = globalSettings.url || '';
+                        usernameInput.value = globalSettings.username || '';
+                        passwordInput.value = globalSettings.password || '';
+                    }
+                    showView('login');
+                });
+            }
+            
+            else if (payload.event === 'fetch_failed') {
+                showView('login');
+                connError.textContent = "Server configuration invalid: " + (payload.error || "");
+                connError.style.display = 'block';
+            }
+        });
+
+        // Save settings helper
+        async function updateActionSettings(newFields) {
+            activeSettings = { ...activeSettings, ...newFields };
+            await streamDeckClient.setSettings(activeSettings);
+        }
+
+        // Initialize Property Inspector
+        async function init() {
+            showView('loading');
+            loadingText.textContent = "Loading configuration...";
+            
+            try {
+                activeSettings = await streamDeckClient.getSettings() || {};
+                
+                await streamDeckClient.send('sendToPlugin', {
+                    event: 'fetch_hosts_services'
+                });
+            } catch (err) {
+                console.error("Init failed:", err);
+                showView('login');
+            }
+        }
+
+        // Connect button handler
+        connectBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            
+            if (!url || !username || !password) {
+                connError.textContent = "Please fill in all fields.";
+                connError.style.display = 'block';
+                return;
+            }
+            
+            connError.style.display = 'none';
+            showView('loading');
+            loadingText.textContent = "Connecting to Nagios Core...";
+            
+            await streamDeckClient.send('sendToPlugin', {
+                event: 'connect',
+                url,
+                username,
+                password
+            });
+        });
+
+        // Disconnect button handler
+        disconnectBtn.addEventListener('click', async () => {
+            await updateActionSettings({
+                url: '',
+                username: '',
+                password: '',
+                hostName: '',
+                serviceName: ''
+            });
+            showView('login');
+        });
+
+        // Populate dropdowns & restore values
+        function setupSettingsForm() {
+            serverLabel.textContent = urlInput.value.replace(/^https?:\/\//, '').split('/')[0];
+            serverLabel.title = urlInput.value;
+            
+            entityTypeSelect.value = activeSettings.entityType || 'host';
+            intervalSelect.value = activeSettings.interval || '30';
+            warnThresholdInput.value = activeSettings.warnThreshold !== undefined ? activeSettings.warnThreshold : '99.0';
+            critThresholdInput.value = activeSettings.critThreshold !== undefined ? activeSettings.critThreshold : '98.0';
+            
+            hostSelect.innerHTML = '<option value="">-- Select Host --</option>';
+            globalHostNames.forEach(h => {
+                const opt = document.createElement('option');
+                opt.value = h;
+                opt.textContent = h;
+                hostSelect.appendChild(opt);
+            });
+            
+            if (activeSettings.hostName && globalHostNames.includes(activeSettings.hostName)) {
+                hostSelect.value = activeSettings.hostName;
+            }
+            
+            hostgroupSelect.innerHTML = '<option value="">-- All Hostgroups --</option>';
+            globalHostgroups.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g;
+                opt.textContent = g;
+                hostgroupSelect.appendChild(opt);
+            });
+            if (activeSettings.hostgroup && globalHostgroups.includes(activeSettings.hostgroup)) {
+                hostgroupSelect.value = activeSettings.hostgroup;
+            } else {
+                hostgroupSelect.value = '';
+            }
+
+            servicegroupSelect.innerHTML = '<option value="">-- All Servicegroups --</option>';
+            globalServicegroups.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g;
+                opt.textContent = g;
+                servicegroupSelect.appendChild(opt);
+            });
+            if (activeSettings.servicegroup && globalServicegroups.includes(activeSettings.servicegroup)) {
+                servicegroupSelect.value = activeSettings.servicegroup;
+            } else {
+                servicegroupSelect.value = '';
+            }
+
+            toggleFields();
+            populateServices();
+            
+            if (activeSettings.serviceName) {
+                serviceSelect.value = activeSettings.serviceName;
+            }
+        }
+
+        // Field visibility toggle
+        function toggleFields() {
+            const type = entityTypeSelect.value;
+            const isHost = type === 'host';
+            const isService = type === 'service';
+            const isHostTotals = type === 'host_totals';
+            const isServiceTotals = type === 'service_totals';
+            const isTotals = isHostTotals || isServiceTotals;
+            
+            hostItem.style.display = (isHost || isService) ? 'block' : 'none';
+            serviceItem.style.display = isService ? 'block' : 'none';
+            
+            hostgroupItem.style.display = isTotals ? 'block' : 'none';
+            servicegroupItem.style.display = isServiceTotals ? 'block' : 'none';
+            
+            warnThresholdItem.style.display = isTotals ? 'block' : 'none';
+            critThresholdItem.style.display = isTotals ? 'block' : 'none';
+        }
+
+        // Populate Services dropdown based on selected host
+        function populateServices() {
+            const selectedHost = hostSelect.value;
+            serviceSelect.innerHTML = '<option value="">-- Select Service --</option>';
+            
+            if (selectedHost && globalHostServiceMap[selectedHost]) {
+                const services = globalHostServiceMap[selectedHost];
+                services.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.textContent = s;
+                    serviceSelect.appendChild(opt);
+                });
+            }
+        }
+
+        // UI Event Listeners
+        entityTypeSelect.addEventListener('change', async () => {
+            toggleFields();
+            const type = entityTypeSelect.value;
+            const isTotals = type === 'host_totals' || type === 'service_totals';
+            await updateActionSettings({
+                entityType: type,
+                serviceName: type === 'service' ? serviceSelect.value : '',
+                hostName: (type === 'host' || type === 'service') ? hostSelect.value : '',
+                warnThreshold: parseFloat(warnThresholdInput.value) || 99.0,
+                critThreshold: parseFloat(critThresholdInput.value) || 98.0,
+                hostgroup: isTotals ? hostgroupSelect.value : '',
+                servicegroup: isTotals ? servicegroupSelect.value : ''
+            });
+        });
+
+        hostSelect.addEventListener('change', async () => {
+            populateServices();
+            await updateActionSettings({
+                hostName: hostSelect.value,
+                serviceName: ''
+            });
+        });
+
+        serviceSelect.addEventListener('change', async () => {
+            await updateActionSettings({
+                serviceName: serviceSelect.value
+            });
+        });
+
+        warnThresholdInput.addEventListener('change', async () => {
+            await updateActionSettings({
+                warnThreshold: parseFloat(warnThresholdInput.value) || 99.0
+            });
+        });
+
+        critThresholdInput.addEventListener('change', async () => {
+            await updateActionSettings({
+                critThreshold: parseFloat(critThresholdInput.value) || 98.0
+            });
+        });
+
+        hostgroupSelect.addEventListener('change', async () => {
+            if (entityTypeSelect.value === 'service_totals' && hostgroupSelect.value !== '') {
+                servicegroupSelect.value = '';
+            }
+            await updateActionSettings({
+                hostgroup: hostgroupSelect.value,
+                servicegroup: servicegroupSelect.value
+            });
+        });
+
+        servicegroupSelect.addEventListener('change', async () => {
+            if (servicegroupSelect.value !== '') {
+                hostgroupSelect.value = '';
+            }
+            await updateActionSettings({
+                hostgroup: hostgroupSelect.value,
+                servicegroup: servicegroupSelect.value
+            });
+        });
+
+        intervalSelect.addEventListener('change', async () => {
+            await updateActionSettings({
+                interval: parseInt(intervalSelect.value, 10)
+            });
+        });
+
+        // Wait for connection to Stream Deck to initialize
+        let checkCount = 0;
+        const checkReady = setInterval(() => {
+            checkCount++;
+            if (typeof SDPIComponents !== 'undefined' && SDPIComponents.streamDeckClient) {
+                clearInterval(checkReady);
+                init();
+            } else if (checkCount > 100) {
+                clearInterval(checkReady);
+                document.body.innerHTML = '<div style="color:red;padding:10px;">Failed to initialize Stream Deck client connection.</div>';
+            }
+        }, 100);
+    </script>
+</body>
+</html>

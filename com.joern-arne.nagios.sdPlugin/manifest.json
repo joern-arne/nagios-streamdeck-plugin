@@ -1,0 +1,47 @@
+{
+	"Name": "Nagios Status",
+	"Version": "0.1.0.0",
+	"Author": "Joern-Arne",
+	"Actions": [
+		{
+			"Name": "Nagios Status",
+			"UUID": "com.joern-arne.nagios.status",
+			"Icon": "imgs/actions/status/icon",
+			"Tooltip": "Displays Nagios host or service status.",
+			"PropertyInspectorPath": "ui/status.html",
+			"Controllers": [
+				"Keypad"
+			],
+			"States": [
+				{
+					"Image": "imgs/actions/status/key",
+					"TitleAlignment": "middle"
+				}
+			]
+		}
+	],
+	"Category": "Nagios Status",
+	"CategoryIcon": "imgs/plugin/category-icon",
+	"CodePath": "bin/plugin.js",
+	"Description": "Show Nagios host and service status on buttons",
+	"Icon": "imgs/plugin/marketplace",
+	"SDKVersion": 3,
+	"Software": {
+		"MinimumVersion": "7.1"
+	},
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "12"
+		},
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
+		}
+	],
+	"Nodejs": {
+		"Version": "24",
+		"Debug": "enabled"
+	},
+	"UUID": "com.joern-arne.nagios"
+}
