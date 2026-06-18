@@ -71,23 +71,23 @@ If you want to modify, compile, or debug the plugin locally:
 ### Compilation
 Build the TypeScript source files into the bundle:
 ```bash
-npm run build
+make build   # Or: npm run build
 ```
 
 ### Local Linking & Debugging
 To symlink your development folder to the Stream Deck app so changes apply live:
 ```bash
-npx @elgato/cli link com.joern-arne.nagios.sdPlugin
+make link    # Or: npx @elgato/cli link com.joern-arne.nagios.sdPlugin
 ```
 Start the watch script to build and automatically reload the plugin when files change:
 ```bash
-npm run watch
+make watch   # Or: npm run watch
 ```
 
 ### Packaging
 To package a new `.streamDeckPlugin` distribution installer:
 ```bash
-npx @elgato/cli pack com.joern-arne.nagios.sdPlugin --force
+make pack    # Or: npx @elgato/cli pack com.joern-arne.nagios.sdPlugin --force
 ```
 
 ---

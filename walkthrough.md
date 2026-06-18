@@ -47,9 +47,9 @@ Created [status.html](com.joern-arne.nagios.sdPlugin/ui/status.html):
 ## Build & Validation Results
 
 ### Compiling typescript
-We ran `npm run build` to compile the TS files:
+We ran `make build` (or `npm run build`) to compile the TS files:
 ```bash
-npm run build
+make build
 ```
 Result: `created com.joern-arne.nagios.sdPlugin/bin/plugin.js in 1.1s` (no errors).
 
@@ -79,7 +79,7 @@ We generated professional, high-resolution screenshots and marketing graphics sh
 ### 3. Packaging the Plugin
 To bundle the plugin into the official Stream Deck installer package (`.streamDeckPlugin`):
 ```bash
-npx @elgato/cli pack com.joern-arne.nagios.sdPlugin --force
+make pack   # Or: npx @elgato/cli pack com.joern-arne.nagios.sdPlugin --force
 ```
 This produces the final distribution file:
 - **`com.joern-arne.nagios.streamDeckPlugin`** in the repository root.
@@ -94,13 +94,13 @@ Double-click the generated `com.joern-arne.nagios.streamDeckPlugin` installer. T
 ### 2. Developer Linking (Simulating Development)
 To register the directory directly with Stream Deck without installing a packed package:
 ```bash
-npx @elgato/cli link com.joern-arne.nagios.sdPlugin
+make link   # Or: npx @elgato/cli link com.joern-arne.nagios.sdPlugin
 ```
 
 ### 3. Run in Development Mode
 During development, you can start the watch process, which will rebuild the plugin and restart the Stream Deck instance automatically whenever code changes:
 ```bash
-npm run watch
+make watch  # Or: npm run watch
 ```
 *(Make sure the Stream Deck app is running on your Mac/Windows system)*
 
