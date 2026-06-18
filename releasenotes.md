@@ -4,6 +4,18 @@ This document outlines the changes, new features, and bug fixes for each version
 
 ---
 
+## [v0.2.0] - 2026-06-18
+
+### Added
+- **Background Status Graphs**:
+  - Draw a beautiful, subtle sparkline graph in the background of button keys showing status history over time.
+  - Available for all monitored types (Hosts, Services, Host Totals, Service Totals).
+  - Configurable duration (from 5 minutes up to 24 hours, default 60 min) adjustable directly in the Property Inspector.
+  - Active background polling that continues to collect status metrics even when the button is off-screen/hidden, while pausing SVG rendering to optimize performance.
+  - History is automatically reset if button monitored entity configuration is modified.
+
+---
+
 ## [v0.1.0] - 2026-06-18
 
 ### Added

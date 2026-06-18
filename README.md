@@ -15,6 +15,7 @@ Bring Nagios Core monitoring straight to your fingertips. This Stream Deck plugi
 
 ## ✨ Features
 *   🟢 **Real-Time Key Indicators**: Buttons update color dynamically (Green for OK/UP, Yellow for Warning, Red for Critical/DOWN, Grey for Unknown/Unreachable/Offline).
+*   📈 **Background Status Graphs**: Render a beautiful sparkline graph directly in the background of your button keys to track availability percentages and status trends over time.
 *   📊 **Tactical Totals**: Display overall network availability percentages and success ratios (e.g. `UP: 145/146` or `OK: 961/965`) directly on a single key.
 *   🏷️ **Group-Scoped Monitoring**: Limit totals checks to a specific **Hostgroup** or **Servicegroup** via simple dropdown menus.
 *   ⚙️ **Custom Alert Thresholds**: Configure custom Warning and Critical percentages for totals buttons to trigger yellow/red warnings.
@@ -54,6 +55,7 @@ Bring Nagios Core monitoring straight to your fingertips. This Stream Deck plugi
 *   **Service Totals**: Calculates overall service availability. You can configure:
     *   *Servicegroup* or *Hostgroup* filters.
     *   *Thresholds*: Define custom warning (default: `99.0%`) and critical (default: `98.0%`) limits.
+*   **Background Graphs**: Available for all monitored types. Check "Show Graph" and choose a "Graph Duration" (from 5 minutes up to 24 hours, default 60 min) in the Property Inspector to display a real-time status trend sparkline behind the status text. Polling keeps running in the background even when buttons are off-screen to log uninterrupted history data points.
 
 ---
 

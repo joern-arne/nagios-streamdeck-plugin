@@ -16,6 +16,8 @@ type NagiosSettings = {
 	interval?: number; // update interval in seconds
 	warnThreshold?: number;
 	critThreshold?: number;
+	showGraph?: boolean;
+	graphDuration?: number; // in minutes
 };
 
 // Helper to get basic-auth header
@@ -57,6 +59,9 @@ function formatDuration(lastStateChangeMs: number, queryTimeMs: number): string 
 @action({ UUID: "com.joern-arne.nagios.status" })
 export class NagiosStatus extends SingletonAction<NagiosSettings> {
 	private timers = new Map<string, NodeJS.Timeout>();
+	private history = new Map<string, Array<{ time: number; value: number }>>();
+	private lastEntityKey = new Map<string, string>();
+	private visibleActions = new Set<string>();
 
 	/**
 	 * Stops the active polling timer for a specific action instance.
@@ -73,13 +78,21 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 	 * Starts the polling schedule for an action instance.
 	 */
 	private startPolling(action: any, settings: NagiosSettings) {
+		const entityKey = this.getEntityKey(settings);
+		if (this.lastEntityKey.get(action.id) !== entityKey) {
+			this.history.delete(action.id);
+			this.lastEntityKey.set(action.id, entityKey);
+		}
+
 		this.stopPolling(action.id);
 
 		const isTotals = settings.entityType === "host_totals" || settings.entityType === "service_totals";
 		const hasConfig = settings.url && settings.username && settings.password && (isTotals || settings.hostName);
 		if (!hasConfig) {
 			// Not configured yet, draw a neutral setup button
-			this.drawConfigureState(action);
+			if (this.visibleActions.has(action.id)) {
+				this.drawConfigureState(action);
+			}
 			return;
 		}
 
@@ -107,7 +120,9 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 				queryUrl = `${cleanUrl}/cgi-bin/statusjson.cgi?query=host&hostname=${encodeURIComponent(settings.hostName!)}`;
 			} else if (settings.entityType === "service") {
 				if (!settings.serviceName) {
-					this.drawConfigureState(action);
+					if (this.visibleActions.has(action.id)) {
+						this.drawConfigureState(action);
+					}
 					return;
 				}
 				queryUrl = `${cleanUrl}/cgi-bin/statusjson.cgi?query=service&hostname=${encodeURIComponent(settings.hostName!)}&servicedescription=${encodeURIComponent(settings.serviceName)}`;
@@ -137,7 +152,10 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 					const all = up + down + unreachable + pending;
 					const avail = all > 0 ? (up / all) * 100 : 100.0;
-					await this.drawTotalsButton(action, settings.hostgroup.toUpperCase(), avail, up, all, settings);
+					this.updateHistory(action.id, avail, settings);
+					if (this.visibleActions.has(action.id)) {
+						await this.drawTotalsButton(action, settings.hostgroup.toUpperCase(), avail, up, all, settings);
+					}
 					return;
 				}
 
@@ -163,7 +181,10 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 				const all = up + down + unreachable + pending;
 				const avail = all > 0 ? (up / all) * 100 : 100.0;
-				await this.drawTotalsButton(action, "HOST TOTALS", avail, up, all, settings);
+				this.updateHistory(action.id, avail, settings);
+				if (this.visibleActions.has(action.id)) {
+					await this.drawTotalsButton(action, "HOST TOTALS", avail, up, all, settings);
+				}
 				return;
 			} else if (settings.entityType === "service_totals") {
 				if (settings.servicegroup || settings.hostgroup) {
@@ -198,7 +219,10 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					const all = ok + warn + crit + unkn + pend;
 					const avail = all > 0 ? (ok / all) * 100 : 100.0;
 					const titleText = settings.servicegroup ? settings.servicegroup : settings.hostgroup!;
-					await this.drawTotalsButton(action, titleText.toUpperCase(), avail, ok, all, settings);
+					this.updateHistory(action.id, avail, settings);
+					if (this.visibleActions.has(action.id)) {
+						await this.drawTotalsButton(action, titleText.toUpperCase(), avail, ok, all, settings);
+					}
 					return;
 				}
 
@@ -226,7 +250,10 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 				const all = ok + warn + crit + unkn + pend;
 				const avail = all > 0 ? (ok / all) * 100 : 100.0;
-				await this.drawTotalsButton(action, "SERVICE TOTALS", avail, ok, all, settings);
+				this.updateHistory(action.id, avail, settings);
+				if (this.visibleActions.has(action.id)) {
+					await this.drawTotalsButton(action, "SERVICE TOTALS", avail, ok, all, settings);
+				}
 				return;
 			}
 
@@ -249,25 +276,38 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			if (settings.entityType === "host") {
 				const hostData = resJson.data.host;
 				const status = hostData.status;
+				const avail = status === 2 ? 100.0 : 0.0;
+				this.updateHistory(action.id, avail, settings);
 				const lastStateChange = hostData.last_state_change || hostData.last_hard_state_change || 0;
-				await this.drawButton(action, settings.hostName!, "HOST", status, lastStateChange, queryTime);
+				if (this.visibleActions.has(action.id)) {
+					await this.drawButton(action, settings.hostName!, "HOST", status, lastStateChange, queryTime, settings);
+				}
 			} else if (settings.entityType === "service") {
 				const serviceData = resJson.data.service;
 				const status = serviceData.status;
+				let avail = 0.0;
+				if (status === 2) avail = 100.0;
+				else if (status === 4) avail = 50.0;
+				else avail = 0.0;
+				this.updateHistory(action.id, avail, settings);
 				const lastStateChange = serviceData.last_state_change || serviceData.last_hard_state_change || 0;
-				await this.drawButton(action, settings.serviceName!, "SERVICE", status, lastStateChange, queryTime);
+				if (this.visibleActions.has(action.id)) {
+					await this.drawButton(action, settings.serviceName!, "SERVICE", status, lastStateChange, queryTime, settings);
+				}
 			}
 		} catch (err: any) {
 			streamDeck.logger.error(`Nagios check failed:`, err);
-			await this.drawErrorState(
-				action,
-				settings.entityType === "host_totals"
-					? "Host Totals"
-					: settings.entityType === "service_totals"
-					? "Service Totals"
-					: settings.hostName || "Nagios",
-				err.message || "Error"
-			);
+			if (this.visibleActions.has(action.id)) {
+				await this.drawErrorState(
+					action,
+					settings.entityType === "host_totals"
+						? "Host Totals"
+						: settings.entityType === "service_totals"
+						? "Service Totals"
+						: settings.hostName || "Nagios",
+					err.message || "Error"
+				);
+			}
 		}
 	}
 
@@ -318,6 +358,14 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
   <text x="72" y="36" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc2}</text>
 		`.trim();
 
+		let graphSvg = "";
+		if (settings.showGraph) {
+			const durationMin = settings.graphDuration !== undefined ? parseFloat(settings.graphDuration as any) : 60;
+			const durationMs = durationMin * 60 * 1000;
+			const actionHistory = this.history.get(action.id) || [];
+			graphSvg = this.getGraphSvgPath(actionHistory, durationMs, Date.now());
+		}
+
 		const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
   <defs>
@@ -327,6 +375,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
     </linearGradient>
   </defs>
   <rect width="144" height="144" rx="20" fill="url(#bgGrad)" />
+  ${graphSvg}
   <rect width="144" height="72" rx="20" fill="white" fill-opacity="0.08" />
   
   ${textSvg}
@@ -344,7 +393,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 	/**
 	 * Sets the action image to a dynamic SVG with current state and color.
 	 */
-	private async drawButton(action: any, displayName: string, entityTypeLabel: string, status: number, lastStateChange: number, queryTime: number) {
+	private async drawButton(action: any, displayName: string, entityTypeLabel: string, status: number, lastStateChange: number, queryTime: number, settings: NagiosSettings) {
 		let statusLabel = "UNKNOWN";
 		let startColor = "#4A5568";
 		let endColor = "#718096";
@@ -415,6 +464,14 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			`.trim();
 		}
 
+		let graphSvg = "";
+		if (settings.showGraph) {
+			const durationMin = settings.graphDuration !== undefined ? parseFloat(settings.graphDuration as any) : 60;
+			const durationMs = durationMin * 60 * 1000;
+			const actionHistory = this.history.get(action.id) || [];
+			graphSvg = this.getGraphSvgPath(actionHistory, durationMs, Date.now());
+		}
+
 		const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
   <defs>
@@ -424,6 +481,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
     </linearGradient>
   </defs>
   <rect width="144" height="144" rx="20" fill="url(#bgGrad)" />
+  ${graphSvg}
   <rect width="144" height="72" rx="20" fill="white" fill-opacity="0.08" />
   
   ${textSvg}
@@ -485,15 +543,95 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 		await action.setImage(svgDataUri);
 	}
 
+	private getEntityKey(settings: NagiosSettings): string {
+		return `${settings.entityType || ""}:${settings.hostName || ""}:${settings.serviceName || ""}:${settings.hostgroup || ""}:${settings.servicegroup || ""}`;
+	}
+
+	private updateHistory(actionId: string, avail: number, settings: NagiosSettings) {
+		if (settings.showGraph) {
+			const durationMin = settings.graphDuration !== undefined ? parseFloat(settings.graphDuration as any) : 60;
+			const durationMs = durationMin * 60 * 1000;
+			const now = Date.now();
+
+			let actionHistory = this.history.get(actionId) || [];
+			actionHistory.push({ time: now, value: avail });
+
+			// Filter out old points
+			actionHistory = actionHistory.filter(pt => pt.time >= now - durationMs);
+			this.history.set(actionId, actionHistory);
+		} else {
+			this.history.delete(actionId);
+		}
+	}
+
+	private getGraphSvgPath(history: Array<{ time: number; value: number }>, durationMs: number, now: number): string {
+		if (history.length === 0) return "";
+
+		const Y_MIN = 40;
+		const Y_MAX = 144;
+		const X_MAX = 144;
+		const startTime = now - durationMs;
+
+		const points: Array<{ x: number; y: number }> = [];
+
+		for (const pt of history) {
+			if (pt.time < startTime) continue;
+			const pct = (pt.time - startTime) / durationMs;
+			const x = Math.min(X_MAX, Math.max(0, pct * X_MAX));
+			const y = Y_MAX - (pt.value / 100) * (Y_MAX - Y_MIN);
+			points.push({ x, y });
+		}
+
+		if (points.length === 0) {
+			// If all points are before startTime, use the last one
+			const lastPt = history[history.length - 1];
+			const y = Y_MAX - (lastPt.value / 100) * (Y_MAX - Y_MIN);
+			points.push({ x: 0, y });
+			points.push({ x: X_MAX, y });
+		} else {
+			// Ensure we start at x = 0
+			if (points[0].x > 0) {
+				points.unshift({ x: 0, y: points[0].y });
+			}
+			// Ensure we end at x = X_MAX
+			if (points[points.length - 1].x < X_MAX) {
+				points.push({ x: X_MAX, y: points[points.length - 1].y });
+			}
+		}
+
+		// Build SVG path data for area fill
+		let pathD = `M 0,${Y_MAX}`;
+		for (const pt of points) {
+			pathD += ` L ${pt.x.toFixed(1)},${pt.y.toFixed(1)}`;
+		}
+		pathD += ` L ${X_MAX},${Y_MAX} Z`;
+
+		// Build SVG path data for stroke line
+		let lineD = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+		for (let i = 1; i < points.length; i++) {
+			lineD += ` L ${points[i].x.toFixed(1)},${points[i].y.toFixed(1)}`;
+		}
+
+		return `
+  <path d="${pathD}" fill="white" fill-opacity="0.12" />
+  <path d="${lineD}" fill="none" stroke="white" stroke-opacity="0.35" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+		`.trim();
+	}
+
 	override onWillAppear(ev: WillAppearEvent<NagiosSettings>): void | Promise<void> {
+		this.visibleActions.add(ev.action.id);
 		this.startPolling(ev.action, ev.payload.settings);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<NagiosSettings>): void | Promise<void> {
-		this.stopPolling(ev.action.id);
+		this.visibleActions.delete(ev.action.id);
+		if (!ev.payload.settings.showGraph) {
+			this.stopPolling(ev.action.id);
+		}
 	}
 
 	override onDidReceiveSettings(ev: DidReceiveSettingsEvent<NagiosSettings>): void | Promise<void> {
+		this.visibleActions.add(ev.action.id);
 		this.startPolling(ev.action, ev.payload.settings);
 	}
 

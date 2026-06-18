@@ -19,6 +19,7 @@ No more constantly switching tabs or checking dashboards—your Stream Deck keys
 * 🟢 **Real-Time Status Indicators**: Monitor individual hosts or services with color-coded buttons (Green for UP/OK, Yellow for Warning, Red for Down/Critical, Grey for Unreachable/Unknown).
 * 📊 **Tactical Totals**: Display overall network availability percentages and success ratios (e.g. `UP: 145/146` or `OK: 961/965`) directly on a single key.
 * 🏷️ **Group-Scoped Monitoring**: Limit totals monitoring to a specific **Hostgroup** or **Servicegroup** using easy-to-use dropdown menus.
+* 📈 **Background Status Graphs**: Draw a beautiful sparkline graph directly in the background of your button keys. Configure custom durations (from 5 minutes up to 24 hours, default 60 min) to track availability percentages and status trends over time.
 * ⚙️ **Custom Alerts & Thresholds**: Set personalized Warning and Critical percentage thresholds for your Totals keys to trigger Yellow or Red alerts instantly.
 * ⚡ **One-Press Quick Actions**: Press any key to open the corresponding Nagios configuration page, extended status info, or group overview in your default browser.
 * 🚀 **Engineered for Scale**: Built with performance in mind. Queries are optimized to fetch lightweight tactical overviews (`tac.cgi`) for global summaries, preventing HTTP 500 errors and timeout issues even on large-scale infrastructure environments.
