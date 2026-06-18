@@ -86,6 +86,32 @@ This produces the final distribution file:
 
 ---
 
+## Release & Versioning Workflow
+
+We have provided an automated release wizard script at [scripts/release.cjs](scripts/release.cjs). You can run it directly using the Makefile:
+
+```bash
+make release
+```
+
+### What the Release Wizard Does:
+1. **Verifies Git Cleanliness**: Ensures you don't have uncommitted changes in your repository.
+2. **Prompts for New Version**: Asks you to input the new version number in the required `X.Y.Z.W` format (e.g. `0.1.1.0`).
+3. **Updates Manifest**: Automatically parses and modifies the `Version` field in [manifest.json](com.joern-arne.nagios.sdPlugin/manifest.json).
+4. **Commits Version Bump**: Stages and commits the updated manifest file.
+5. **Tags the Commit**: Creates an annotated Git tag (e.g. `v0.1.1.0`) on the version bump commit.
+6. **Builds & Packages**: Compiles the source files and packages the final `com.joern-arne.nagios.streamDeckPlugin` installer.
+
+### Final Steps After Running the Wizard:
+1. Review your [releasenotes.md](releasenotes.md) file to log changes.
+2. Push your changes and tags to the remote repository:
+   ```bash
+   git push origin main --tags
+   ```
+3. Log in to the [Elgato Maker Console](https://marketplace.elgato.com/) and upload the generated `com.joern-arne.nagios.streamDeckPlugin` installer.
+
+---
+
 ## How to Run & Test the Plugin Locally
 
 ### 1. Direct Installation

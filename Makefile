@@ -23,8 +23,9 @@ link:
 pack: build
 	npx @elgato/cli pack com.joern-arne.nagios.sdPlugin --force
 
-# Alias to package the release
-release: pack
+# Run interactive release wizard to update manifest, commit, tag, and package
+release:
+	node scripts/release.cjs
 
 # Clean generated build artifacts and installer packages
 clean:
