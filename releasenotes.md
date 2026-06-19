@@ -4,6 +4,16 @@ This document outlines the changes, new features, and bug fixes for each version
 
 ---
 
+## [v0.2.1] - 2026-06-19
+
+### Fixed
+- **HTTP 500 / Offline errors on Service Totals**:
+  - Replaced heavy detailed query APIs (`query=servicelist&details=true` and `query=hostlist&details=true`) with lightweight, pre-aggregated count APIs (`query=servicecount` and `query=hostcount`) for filtered totals.
+  - Bypasses the Nagios Core CGI details generation bug that causes memory limits/crashes on group-filtered status requests.
+  - Bypasses unnecessary client-side status code mapping and traversal on group lists for improved efficiency.
+
+---
+
 ## [v0.2.0] - 2026-06-18
 
 ### Added

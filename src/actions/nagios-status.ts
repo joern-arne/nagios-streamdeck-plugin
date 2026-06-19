@@ -30,6 +30,79 @@ function getHeaders(settings: NagiosSettings) {
 	};
 }
 
+// Helper to parse servicelist structure, which can be an array of service objects
+// or a nested map of hostName -> serviceName -> serviceObject
+function getServicesFromList(servicelist: any): Array<{ hostName?: string; serviceName?: string; status: number; last_state_change?: number; last_hard_state_change?: number }> {
+	const list: any[] = [];
+	if (Array.isArray(servicelist)) {
+		for (const item of servicelist) {
+			if (item && typeof item === "object") {
+				list.push({
+					hostName: item.host_name || item.hostname,
+					serviceName: item.service_description || item.description || item.service_name,
+					status: item.status,
+					last_state_change: item.last_state_change,
+					last_hard_state_change: item.last_hard_state_change
+				});
+			}
+		}
+	} else if (servicelist && typeof servicelist === "object") {
+		for (const hostName of Object.keys(servicelist)) {
+			const hostServices = servicelist[hostName];
+			if (Array.isArray(hostServices)) {
+				for (const item of hostServices) {
+					if (item && typeof item === "object") {
+						list.push({
+							hostName: hostName,
+							serviceName: item.service_description || item.description || item.service_name,
+							status: item.status,
+							last_state_change: item.last_state_change,
+							last_hard_state_change: item.last_hard_state_change
+						});
+					}
+				}
+			} else if (hostServices && typeof hostServices === "object") {
+				for (const serviceName of Object.keys(hostServices)) {
+					const item = hostServices[serviceName];
+					if (item && typeof item === "object") {
+						list.push({
+							hostName: hostName,
+							serviceName: serviceName,
+							status: item.status,
+							last_state_change: item.last_state_change,
+							last_hard_state_change: item.last_hard_state_change
+						});
+					}
+				}
+			}
+		}
+	}
+	return list;
+}
+
+// Helper to map standard service state codes to bitmask values
+function getNormalizedServiceStatus(status: number, isStandard: boolean): number {
+	if (isStandard) {
+		if (status === 0) return 2; // OK
+		if (status === 1) return 4; // WARNING
+		if (status === 2) return 16; // CRITICAL
+		if (status === 3) return 8; // UNKNOWN
+		if (status === 4) return 1; // PENDING
+	}
+	return status;
+}
+
+// Helper to map standard host state codes to bitmask values
+function getNormalizedHostStatus(status: number, isStandard: boolean): number {
+	if (isStandard) {
+		if (status === 0) return 2; // UP
+		if (status === 1) return 4; // DOWN
+		if (status === 2) return 8; // UNREACHABLE
+		if (status === 3) return 1; // PENDING
+	}
+	return status;
+}
+
 // Helper to format duration
 function formatDuration(lastStateChangeMs: number, queryTimeMs: number): string {
 	if (!lastStateChangeMs || lastStateChangeMs <= 0) return "N/A";
@@ -125,10 +198,10 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					}
 					return;
 				}
-				queryUrl = `${cleanUrl}/cgi-bin/statusjson.cgi?query=service&hostname=${encodeURIComponent(settings.hostName!)}&servicedescription=${encodeURIComponent(settings.serviceName)}`;
+				queryUrl = `${cleanUrl}/cgi-bin/statusjson.cgi?query=servicelist&hostname=${encodeURIComponent(settings.hostName!)}&details=true`;
 			} else if (settings.entityType === "host_totals") {
 				if (settings.hostgroup) {
-					const response = await fetch(`${cleanUrl}/cgi-bin/statusjson.cgi?query=hostlist&hostgroup=${encodeURIComponent(settings.hostgroup)}&details=true`, {
+					const response = await fetch(`${cleanUrl}/cgi-bin/statusjson.cgi?query=hostcount&hostgroup=${encodeURIComponent(settings.hostgroup)}`, {
 						headers: getHeaders(settings),
 						signal: AbortSignal.timeout(10000)
 					});
@@ -136,19 +209,11 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 						throw new Error(`HTTP ${response.status}`);
 					}
 					const resJson = await response.json() as any;
-					const hostlist = resJson.data.hostlist || {};
-					let up = 0;
-					let down = 0;
-					let unreachable = 0;
-					let pending = 0;
-
-					for (const hostName of Object.keys(hostlist)) {
-						const status = hostlist[hostName].status;
-						if (status === 2) up++;
-						else if (status === 4) down++;
-						else if (status === 8) unreachable++;
-						else if (status === 1) pending++;
-					}
+					const count = resJson.data.count || {};
+					const up = count.up || 0;
+					const down = count.down || 0;
+					const unreachable = count.unreachable || 0;
+					const pending = count.pending || 0;
 
 					const all = up + down + unreachable + pending;
 					const avail = all > 0 ? (up / all) * 100 : 100.0;
@@ -189,7 +254,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			} else if (settings.entityType === "service_totals") {
 				if (settings.servicegroup || settings.hostgroup) {
 					const groupParam = settings.servicegroup ? `servicegroup=${encodeURIComponent(settings.servicegroup)}` : `hostgroup=${encodeURIComponent(settings.hostgroup!)}`;
-					const response = await fetch(`${cleanUrl}/cgi-bin/statusjson.cgi?query=servicelist&${groupParam}&details=true`, {
+					const response = await fetch(`${cleanUrl}/cgi-bin/statusjson.cgi?query=servicecount&${groupParam}`, {
 						headers: getHeaders(settings),
 						signal: AbortSignal.timeout(10000)
 					});
@@ -197,24 +262,12 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 						throw new Error(`HTTP ${response.status}`);
 					}
 					const resJson = await response.json() as any;
-					const servicelist = resJson.data.servicelist || {};
-					let ok = 0;
-					let warn = 0;
-					let crit = 0;
-					let unkn = 0;
-					let pend = 0;
-
-					for (const hostName of Object.keys(servicelist)) {
-						const hostServices = servicelist[hostName] || {};
-						for (const serviceName of Object.keys(hostServices)) {
-							const status = hostServices[serviceName].status;
-							if (status === 2) ok++;
-							else if (status === 4) warn++;
-							else if (status === 16) crit++;
-							else if (status === 8) unkn++;
-							else if (status === 1) pend++;
-						}
-					}
+					const count = resJson.data.count || {};
+					const ok = count.ok || 0;
+					const warn = count.warning || 0;
+					const crit = count.critical || 0;
+					const unkn = count.unknown || 0;
+					const pend = count.pending || 0;
 
 					const all = ok + warn + crit + unkn + pend;
 					const avail = all > 0 ? (ok / all) * 100 : 100.0;
@@ -275,7 +328,9 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 			if (settings.entityType === "host") {
 				const hostData = resJson.data.host;
-				const status = hostData.status;
+				const rawStatus = hostData.status;
+				const isStandard = rawStatus === 0;
+				const status = getNormalizedHostStatus(rawStatus, isStandard);
 				const avail = status === 2 ? 100.0 : 0.0;
 				this.updateHistory(action.id, avail, settings);
 				const lastStateChange = hostData.last_state_change || hostData.last_hard_state_change || 0;
@@ -283,8 +338,23 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					await this.drawButton(action, settings.hostName!, "HOST", status, lastStateChange, queryTime, settings);
 				}
 			} else if (settings.entityType === "service") {
-				const serviceData = resJson.data.service;
-				const status = serviceData.status;
+				const services = getServicesFromList(resJson.data.servicelist || {});
+				
+				// Detect if standard status codes are returned
+				let isStandard = false;
+				for (const service of services) {
+					if (service.status === 0 || service.status === 3) {
+						isStandard = true;
+						break;
+					}
+				}
+
+				const serviceData = services.find(s => s.hostName === settings.hostName && s.serviceName === settings.serviceName);
+				if (!serviceData) {
+					throw new Error("Service not found");
+				}
+				const rawStatus = serviceData.status;
+				const status = getNormalizedServiceStatus(rawStatus, isStandard);
 				let avail = 0.0;
 				if (status === 2) avail = 100.0;
 				else if (status === 4) avail = 50.0;
@@ -702,9 +772,16 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 				const hostNames = Object.keys(hostsJson.data.hostlist || {});
 				const hostServiceMap: Record<string, string[]> = {};
-				const servicelist = servicesJson.data.servicelist || {};
-				for (const hostName of Object.keys(servicelist)) {
-					hostServiceMap[hostName] = Object.keys(servicelist[hostName]);
+				const services = getServicesFromList(servicesJson.data.servicelist || {});
+				for (const s of services) {
+					if (s.hostName && s.serviceName) {
+						if (!hostServiceMap[s.hostName]) {
+							hostServiceMap[s.hostName] = [];
+						}
+						if (!hostServiceMap[s.hostName].includes(s.serviceName)) {
+							hostServiceMap[s.hostName].push(s.serviceName);
+						}
+					}
 				}
 
 				let hostgroups: string[] = [];
@@ -788,9 +865,16 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 				const hostNames = Object.keys(hostsJson.data.hostlist || {});
 				const hostServiceMap: Record<string, string[]> = {};
-				const servicelist = servicesJson.data.servicelist || {};
-				for (const hostName of Object.keys(servicelist)) {
-					hostServiceMap[hostName] = Object.keys(servicelist[hostName]);
+				const services = getServicesFromList(servicesJson.data.servicelist || {});
+				for (const s of services) {
+					if (s.hostName && s.serviceName) {
+						if (!hostServiceMap[s.hostName]) {
+							hostServiceMap[s.hostName] = [];
+						}
+						if (!hostServiceMap[s.hostName].includes(s.serviceName)) {
+							hostServiceMap[s.hostName].push(s.serviceName);
+						}
+					}
 				}
 
 				let hostgroups: string[] = [];
