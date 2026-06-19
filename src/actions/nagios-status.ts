@@ -135,6 +135,15 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 	private history = new Map<string, Array<{ time: number; value: number }>>();
 	private lastEntityKey = new Map<string, string>();
 	private visibleActions = new Set<string>();
+	private cleanupTimers = new Map<string, NodeJS.Timeout>();
+	private configCache: {
+		timestamp: number;
+		url: string;
+		hostNames: string[];
+		hostServiceMap: Record<string, string[]>;
+		hostgroups: string[];
+		servicegroups: string[];
+	} | null = null;
 
 	/**
 	 * Stops the active polling timer for a specific action instance.
@@ -690,18 +699,54 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 	override onWillAppear(ev: WillAppearEvent<NagiosSettings>): void | Promise<void> {
 		this.visibleActions.add(ev.action.id);
+
+		// Clear any pending cleanup timer for this action
+		const cleanupTimer = this.cleanupTimers.get(ev.action.id);
+		if (cleanupTimer) {
+			clearTimeout(cleanupTimer);
+			this.cleanupTimers.delete(ev.action.id);
+		}
+
 		this.startPolling(ev.action, ev.payload.settings);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<NagiosSettings>): void | Promise<void> {
 		this.visibleActions.delete(ev.action.id);
-		if (!ev.payload.settings.showGraph) {
+
+		// If showGraph is enabled, schedule a cleanup after 5 minutes of inactivity (switched page/deleted)
+		if (ev.payload.settings.showGraph) {
+			// Clear any existing cleanup timer first
+			const existingTimer = this.cleanupTimers.get(ev.action.id);
+			if (existingTimer) {
+				clearTimeout(existingTimer);
+			}
+
+			const cleanupTimer = setTimeout(() => {
+				this.stopPolling(ev.action.id);
+				this.history.delete(ev.action.id);
+				this.lastEntityKey.delete(ev.action.id);
+				this.cleanupTimers.delete(ev.action.id);
+				streamDeck.logger.info(`Stopped background polling and cleaned up history for inactive action: ${ev.action.id}`);
+			}, 5 * 60 * 1000); // 5 minutes
+
+			this.cleanupTimers.set(ev.action.id, cleanupTimer);
+		} else {
 			this.stopPolling(ev.action.id);
+			this.history.delete(ev.action.id);
+			this.lastEntityKey.delete(ev.action.id);
 		}
 	}
 
 	override onDidReceiveSettings(ev: DidReceiveSettingsEvent<NagiosSettings>): void | Promise<void> {
 		this.visibleActions.add(ev.action.id);
+
+		// Clear any pending cleanup timer for this action
+		const cleanupTimer = this.cleanupTimers.get(ev.action.id);
+		if (cleanupTimer) {
+			clearTimeout(cleanupTimer);
+			this.cleanupTimers.delete(ev.action.id);
+		}
+
 		this.startPolling(ev.action, ev.payload.settings);
 	}
 
@@ -806,6 +851,16 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					streamDeck.logger.warn("Failed to fetch servicegroups in connect:", err);
 				}
 
+				// Populate configuration cache
+				this.configCache = {
+					timestamp: Date.now(),
+					url: cleanUrl,
+					hostNames,
+					hostServiceMap,
+					hostgroups,
+					servicegroups
+				};
+
 				// Persist global settings
 				await streamDeck.settings.setGlobalSettings({ url, username, password });
 
@@ -846,6 +901,23 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 			try {
 				const cleanUrl = url.trim().replace(/\/$/, "");
+
+				// Check configuration cache (valid for 5 minutes)
+				if (this.configCache &&
+					this.configCache.url === cleanUrl &&
+					(Date.now() - this.configCache.timestamp < 5 * 60 * 1000)) {
+					streamDeck.logger.info("Serving host and service list from configuration cache");
+					await streamDeck.ui.sendToPropertyInspector({
+						event: "hosts_services_list",
+						hostNames: this.configCache.hostNames,
+						hostServiceMap: this.configCache.hostServiceMap,
+						hostgroups: this.configCache.hostgroups,
+						servicegroups: this.configCache.servicegroups,
+						credentials: { url, username, password }
+					});
+					return;
+				}
+
 				const headers = {
 					"Authorization": `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`,
 					"Accept": "application/json"
@@ -898,6 +970,16 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 				} catch (err) {
 					streamDeck.logger.warn("Failed to fetch servicegroups:", err);
 				}
+
+				// Populate configuration cache
+				this.configCache = {
+					timestamp: Date.now(),
+					url: cleanUrl,
+					hostNames,
+					hostServiceMap,
+					hostgroups,
+					servicegroups
+				};
 
 				await streamDeck.ui.sendToPropertyInspector({
 					event: "hosts_services_list",
