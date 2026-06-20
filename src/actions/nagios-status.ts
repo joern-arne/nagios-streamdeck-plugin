@@ -906,7 +906,8 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 						hostServiceMap: this.configCache.hostServiceMap,
 						hostgroups: this.configCache.hostgroups,
 						servicegroups: this.configCache.servicegroups,
-						credentials: { url, username, password }
+						credentials: { url, username, password },
+						actionSettings
 					});
 					return;
 				}
@@ -969,7 +970,8 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					hostServiceMap,
 					hostgroups,
 					servicegroups,
-					credentials: { url, username, password }
+					credentials: { url, username, password },
+					actionSettings
 				});
 			} catch (err: any) {
 				streamDeck.logger.error("Error fetching host and service configurations:", err);

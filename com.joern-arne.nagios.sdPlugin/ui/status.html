@@ -244,7 +244,7 @@
         }
 
         // Initialize connection status when SD is ready
-        streamDeckClient.sendToPropertyInspector.subscribe(async (event) => {
+        streamDeckClient.sendToPropertyInspector.subscribe((event) => {
             const payload = (event && event.payload) ? event.payload : event;
             if (!payload || !payload.event) return;
 
@@ -280,30 +280,16 @@
                 globalHostgroups = payload.hostgroups || [];
                 globalServicegroups = payload.servicegroups || [];
 
-                // If activeSettings appears empty the initial getSettings() call may have
-                // resolved before the Stream Deck WebSocket delivered the persisted settings.
-                // Retry now that the connection is confirmed active.
-                if (!activeSettings.entityType && !activeSettings.hostName && !activeSettings.servicegroup) {
-                    try {
-                        const freshSettings = await streamDeckClient.getSettings();
-                        if (freshSettings && Object.keys(freshSettings).length > 0) {
-                            activeSettings = freshSettings;
-                        }
-                    } catch (e) { /* ignore */ }
+                // The plugin always has the persisted action settings, so use them
+                // directly to avoid the getSettings() timing race in the PI.
+                if (payload.actionSettings && Object.keys(payload.actionSettings).length > 0) {
+                    activeSettings = { ...activeSettings, ...payload.actionSettings };
                 }
 
                 if (payload.credentials) {
                     urlInput.value = payload.credentials.url || '';
                     usernameInput.value = payload.credentials.username || '';
                     passwordInput.value = payload.credentials.password || '';
-
-                    if (!activeSettings.url) {
-                        await updateActionSettings({
-                            url: payload.credentials.url,
-                            username: payload.credentials.username,
-                            password: payload.credentials.password
-                        });
-                    }
                 }
 
                 setupSettingsForm();
