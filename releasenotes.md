@@ -4,6 +4,14 @@ This document outlines the changes, new features, and bug fixes for each version
 
 ---
 
+## [v0.2.4] - 2026-06-20
+
+### Fixed
+- **Property Inspector blank after fix in v0.2.3**: The `sendToPropertyInspector` subscribe callback was not declared `async`, causing a syntax error that prevented the entire script from parsing and left the PI empty.
+- **Button settings still lost on reopen**: `streamDeckClient.getSettings()` has an unavoidable timing race in the PI — it can return `{}` before the Stream Deck WebSocket has delivered the persisted `didReceiveSettings` event, even on a retry. Fixed by having the plugin echo the full action settings back in the `hosts_services_list` payload, which the PI then merges into `activeSettings` before populating the form. The plugin-side `ev.action.getSettings()` is always reliable since the plugin is a persistent process.
+
+---
+
 ## [v0.2.3] - 2026-06-20
 
 ### Fixed
