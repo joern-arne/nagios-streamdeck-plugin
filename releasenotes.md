@@ -4,6 +4,16 @@ This document outlines the changes, new features, and bug fixes for each version
 
 ---
 
+## [v0.2.5] - 2026-06-20
+
+### Changed
+- **Automated GitHub releases**: Pushing a version tag now triggers a GitHub Actions workflow (`.github/workflows/release.yml`) that builds the plugin, packages it, extracts the matching release notes section, and publishes a GitHub release with the `.streamDeckPlugin` binary attached — no manual steps required beyond uploading to the Elgato Maker Console.
+- **Simplified release wizard**: `scripts/release.cjs` now handles only the version bump, commit, tag, and push. Build, packaging, and release creation are delegated to GitHub Actions.
+- **Installation link**: README now points to the GitHub Releases page for downloading the plugin instead of the repository root.
+- **Walkthrough updated**: Release & Versioning Workflow section reflects the new two-step release process.
+
+---
+
 ## [v0.2.4] - 2026-06-20
 
 ### Fixed

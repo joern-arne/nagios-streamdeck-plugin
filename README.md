@@ -36,7 +36,7 @@ Bring Nagios Core monitoring straight to your fingertips. This Stream Deck plugi
 ## 🚀 Getting Started
 
 ### 1. Installation
-1. Download the pre-packed **`com.joern-arne.nagios.streamDeckPlugin`** file from the root of this repository.
+1. Download the latest **`com.joern-arne.nagios.streamDeckPlugin`** file from the [Releases](../../releases/latest) page.
 2. Double-click the file to install the plugin directly into your Elgato Stream Deck software.
 
 ### 2. Connection Setup

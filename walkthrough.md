@@ -88,27 +88,34 @@ This produces the final distribution file:
 
 ## Release & Versioning Workflow
 
-We have provided an automated release wizard script at [scripts/release.cjs](scripts/release.cjs). You can run it directly using the Makefile:
+Releasing is a two-step process: a local wizard handles the version bump and tag, then a GitHub Actions workflow automatically builds the plugin and publishes the GitHub release.
+
+### Step 1 — Run the Release Wizard
+
+Update [releasenotes.md](releasenotes.md) with the changes for the new version first, then run:
 
 ```bash
 make release
 ```
 
-### What the Release Wizard Does:
+The wizard ([scripts/release.cjs](scripts/release.cjs)) does the following:
 1. **Verifies Git Cleanliness**: Ensures you don't have uncommitted changes in your repository.
-2. **Prompts for New Version**: Asks you to input the new version number in the required `X.Y.Z.W` format (e.g. `0.1.1.0`).
+2. **Prompts for New Version**: Asks you to input the new version number in the required `X.Y.Z.W` format (e.g. `0.2.5.0`).
 3. **Updates Manifest**: Automatically parses and modifies the `Version` field in [manifest.json](com.joern-arne.nagios.sdPlugin/manifest.json).
 4. **Commits Version Bump**: Stages and commits the updated manifest file.
-5. **Tags the Commit**: Creates an annotated Git tag (e.g. `v0.1.1.0`) on the version bump commit.
-6. **Builds & Packages**: Compiles the source files and packages the final `com.joern-arne.nagios.streamDeckPlugin` installer.
+5. **Tags the Commit**: Creates an annotated Git tag (e.g. `v0.2.5.0`) on the version bump commit.
+6. **Pushes to Remote**: Pushes the commit and tag to `origin main`, which triggers the GitHub Actions release workflow.
 
-### Final Steps After Running the Wizard:
-1. Review your [releasenotes.md](releasenotes.md) file to log changes.
-2. Push your changes and tags to the remote repository:
-   ```bash
-   git push origin main --tags
-   ```
-3. Log in to the [Elgato Maker Console](https://marketplace.elgato.com/) and upload the generated `com.joern-arne.nagios.streamDeckPlugin` installer.
+### Step 2 — GitHub Actions Release Workflow
+
+Pushing a `v*.*.*.*` tag automatically triggers [.github/workflows/release.yml](.github/workflows/release.yml), which:
+1. Installs dependencies and compiles the TypeScript source.
+2. Packages the plugin into `com.joern-arne.nagios.streamDeckPlugin` via `@elgato/cli pack`.
+3. Extracts the release notes for the new version from [releasenotes.md](releasenotes.md).
+4. Creates a GitHub release tagged `v0.2.5.0`, titled `Nagios Stream Deck Plugin v0.2.5`, with the extracted release notes and the `.streamDeckPlugin` binary attached.
+
+### After the Workflow Completes
+Log in to the [Elgato Maker Console](https://marketplace.elgato.com/) and upload the `com.joern-arne.nagios.streamDeckPlugin` binary from the GitHub release.
 
 ---
 
