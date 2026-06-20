@@ -4,6 +4,21 @@ This document outlines the changes, new features, and bug fixes for each version
 
 ---
 
+## [v0.2.3] - 2026-06-20
+
+### Fixed
+- **Duration labels always showed near-zero values**: `formatDuration` received Nagios Unix timestamps in seconds but divided by 1000, so a 1-hour outage showed as `"3s"`. Fixed by treating both timestamps as seconds directly.
+- **Wrong host status on non-UP hosts**: `isStandard` detection used `rawStatus === 0` (UP only). A DOWN host in standard-code Nagios showed as PENDING; UNREACHABLE showed as UP. Detection now also covers the unambiguous standard-only code `3` (PENDING).
+- **Wrong service status on all-WARNING/CRITICAL hosts**: The `isStandard` heuristic scanned the service list for status `0` or `3`. If every service on the host was WARNING or CRITICAL, no match was found, causing WARNING to display as PENDING and CRITICAL to display as OK. Reverted to the direct `query=service&servicedescription=Y` endpoint, which avoids the ambiguity entirely and eliminates the over-fetch of all host services per poll cycle.
+- **SVG rendering broken for host/service names containing `&`, `<`, or `>`**: Names were interpolated raw into SVG XML. Added XML escaping to all three draw functions.
+- **Property Inspector settings not restored on reopen**: `getSettings()` was called immediately when the Stream Deck client library loaded, before the underlying WebSocket had delivered the persisted `didReceiveSettings` message. Added a fallback re-fetch inside the `hosts_services_list` handler so settings are retried once the connection is confirmed active.
+- **Credentials not persisted when PI closed quickly**: `updateActionSettings` was called without `await` in the `hosts_services_list` handler. If the property inspector was closed before the promise resolved, the URL/credentials were lost from action settings.
+- **Stale hostgroup/servicegroup survived "Change Server"**: The disconnect button only cleared `url`, `username`, `password`, `hostName`, and `serviceName`. `hostgroup` and `servicegroup` were left in settings, causing the plugin to silently query non-existent groups on the new server. Both are now cleared on disconnect.
+- **Threshold of 0% saved as 99%**: `parseFloat(input.value) || 99.0` treated a deliberately entered threshold of `0` as falsy. Replaced with `Number.isFinite(val) ? val : 99.0`.
+- **Duplicate `hostServiceMap`-building code**: The service-list traversal loop appeared verbatim in two plugin handlers. Extracted to a shared `buildHostServiceMap()` helper.
+
+---
+
 ## [v0.2.1] - 2026-06-19
 
 ### Fixed

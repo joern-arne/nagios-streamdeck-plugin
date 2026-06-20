@@ -54,7 +54,7 @@ rl.question('Enter new version (X.Y.Z.W format, e.g. 0.1.1.0): ', (newVersion) =
     try {
         // 4. Update manifest.json version
         manifest.Version = newVersion;
-        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, '\t') + '\n');
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, '\t'));
         console.log(`✅ Updated manifest.json to version ${newVersion}`);
         
         // 5. Commit version bump

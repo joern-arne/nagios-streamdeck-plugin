@@ -30,6 +30,23 @@ function getHeaders(settings: NagiosSettings) {
 	};
 }
 
+function escapeXml(str: string): string {
+	return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function buildHostServiceMap(services: Array<{ hostName?: string; serviceName?: string }>): Record<string, string[]> {
+	const map: Record<string, string[]> = {};
+	for (const s of services) {
+		if (s.hostName && s.serviceName) {
+			if (!map[s.hostName]) map[s.hostName] = [];
+			if (!map[s.hostName].includes(s.serviceName)) {
+				map[s.hostName].push(s.serviceName);
+			}
+		}
+	}
+	return map;
+}
+
 // Helper to parse servicelist structure, which can be an array of service objects
 // or a nested map of hostName -> serviceName -> serviceObject
 function getServicesFromList(servicelist: any): Array<{ hostName?: string; serviceName?: string; status: number; last_state_change?: number; last_hard_state_change?: number }> {
@@ -103,11 +120,11 @@ function getNormalizedHostStatus(status: number, isStandard: boolean): number {
 	return status;
 }
 
-// Helper to format duration
-function formatDuration(lastStateChangeMs: number, queryTimeMs: number): string {
-	if (!lastStateChangeMs || lastStateChangeMs <= 0) return "N/A";
-	
-	let diffSeconds = Math.floor((queryTimeMs - lastStateChangeMs) / 1000);
+// Helper to format duration — both arguments are Unix timestamps in seconds (as returned by Nagios statusjson.cgi)
+function formatDuration(lastStateChangeSec: number, queryTimeSec: number): string {
+	if (!lastStateChangeSec || lastStateChangeSec <= 0) return "N/A";
+
+	let diffSeconds = Math.floor(queryTimeSec - lastStateChangeSec);
 	if (diffSeconds < 0) diffSeconds = 0;
 	
 	const days = Math.floor(diffSeconds / 86400);
@@ -207,7 +224,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					}
 					return;
 				}
-				queryUrl = `${cleanUrl}/cgi-bin/statusjson.cgi?query=servicelist&hostname=${encodeURIComponent(settings.hostName!)}&details=true`;
+				queryUrl = `${cleanUrl}/cgi-bin/statusjson.cgi?query=service&hostname=${encodeURIComponent(settings.hostName!)}&servicedescription=${encodeURIComponent(settings.serviceName)}`;
 			} else if (settings.entityType === "host_totals") {
 				if (settings.hostgroup) {
 					const response = await fetch(`${cleanUrl}/cgi-bin/statusjson.cgi?query=hostcount&hostgroup=${encodeURIComponent(settings.hostgroup)}`, {
@@ -338,7 +355,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			if (settings.entityType === "host") {
 				const hostData = resJson.data.host;
 				const rawStatus = hostData.status;
-				const isStandard = rawStatus === 0;
+				const isStandard = rawStatus === 0 || rawStatus === 3;
 				const status = getNormalizedHostStatus(rawStatus, isStandard);
 				const avail = status === 2 ? 100.0 : 0.0;
 				this.updateHistory(action.id, avail, settings);
@@ -347,22 +364,9 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					await this.drawButton(action, settings.hostName!, "HOST", status, lastStateChange, queryTime, settings);
 				}
 			} else if (settings.entityType === "service") {
-				const services = getServicesFromList(resJson.data.servicelist || {});
-				
-				// Detect if standard status codes are returned
-				let isStandard = false;
-				for (const service of services) {
-					if (service.status === 0 || service.status === 3) {
-						isStandard = true;
-						break;
-					}
-				}
-
-				const serviceData = services.find(s => s.hostName === settings.hostName && s.serviceName === settings.serviceName);
-				if (!serviceData) {
-					throw new Error("Service not found");
-				}
+				const serviceData = resJson.data.service;
 				const rawStatus = serviceData.status;
+				const isStandard = rawStatus === 0 || rawStatus === 3;
 				const status = getNormalizedServiceStatus(rawStatus, isStandard);
 				let avail = 0.0;
 				if (status === 2) avail = 100.0;
@@ -433,8 +437,8 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 		const trunc2 = part2.length > 14 ? part2.substring(0, 11) + "..." : part2;
 
 		const textSvg = `
-  <text x="72" y="22" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc1}</text>
-  <text x="72" y="36" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc2}</text>
+  <text x="72" y="22" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${escapeXml(trunc1)}</text>
+  <text x="72" y="36" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${escapeXml(trunc2)}</text>
 		`.trim();
 
 		let graphSvg = "";
@@ -533,13 +537,13 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			const trunc1 = part1.length > 15 ? part1.substring(0, 12) + "..." : part1;
 			const trunc2 = part2.length > 15 ? part2.substring(0, 12) + "..." : part2;
 			textSvg = `
-  <text x="72" y="21" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc1}</text>
-  <text x="72" y="33" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc2}</text>
+  <text x="72" y="21" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${escapeXml(trunc1)}</text>
+  <text x="72" y="33" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${escapeXml(trunc2)}</text>
 			`.trim();
 		} else {
 			const truncatedName = displayName.length > 15 ? displayName.substring(0, 12) + "..." : displayName;
 			textSvg = `
-  <text x="72" y="32" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${truncatedName}</text>
+  <text x="72" y="32" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${escapeXml(truncatedName)}</text>
 			`.trim();
 		}
 
@@ -613,9 +617,9 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
     </linearGradient>
   </defs>
   <rect width="144" height="144" rx="20" fill="url(#bgGrad)" />
-  <text x="72" y="32" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${truncatedName}</text>
+  <text x="72" y="32" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${escapeXml(truncatedName)}</text>
   <text x="72" y="70" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="900" fill="#ffffff" text-anchor="middle">OFFLINE</text>
-  <text x="72" y="100" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffccd5" text-anchor="middle" opacity="0.9">${shortErr}</text>
+  <text x="72" y="100" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffccd5" text-anchor="middle" opacity="0.9">${escapeXml(shortErr)}</text>
 </svg>
 `.trim();
 		const svgDataUri = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
@@ -816,18 +820,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 				}
 
 				const hostNames = Object.keys(hostsJson.data.hostlist || {});
-				const hostServiceMap: Record<string, string[]> = {};
-				const services = getServicesFromList(servicesJson.data.servicelist || {});
-				for (const s of services) {
-					if (s.hostName && s.serviceName) {
-						if (!hostServiceMap[s.hostName]) {
-							hostServiceMap[s.hostName] = [];
-						}
-						if (!hostServiceMap[s.hostName].includes(s.serviceName)) {
-							hostServiceMap[s.hostName].push(s.serviceName);
-						}
-					}
-				}
+				const hostServiceMap = buildHostServiceMap(getServicesFromList(servicesJson.data.servicelist || {}));
 
 				let hostgroups: string[] = [];
 				let servicegroups: string[] = [];
@@ -936,18 +929,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 				const servicesJson: any = await servicesRes.json();
 
 				const hostNames = Object.keys(hostsJson.data.hostlist || {});
-				const hostServiceMap: Record<string, string[]> = {};
-				const services = getServicesFromList(servicesJson.data.servicelist || {});
-				for (const s of services) {
-					if (s.hostName && s.serviceName) {
-						if (!hostServiceMap[s.hostName]) {
-							hostServiceMap[s.hostName] = [];
-						}
-						if (!hostServiceMap[s.hostName].includes(s.serviceName)) {
-							hostServiceMap[s.hostName].push(s.serviceName);
-						}
-					}
-				}
+				const hostServiceMap = buildHostServiceMap(getServicesFromList(servicesJson.data.servicelist || {}));
 
 				let hostgroups: string[] = [];
 				let servicegroups: string[] = [];

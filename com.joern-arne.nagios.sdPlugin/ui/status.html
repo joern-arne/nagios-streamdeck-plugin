@@ -279,21 +279,33 @@
                 globalHostServiceMap = payload.hostServiceMap || {};
                 globalHostgroups = payload.hostgroups || [];
                 globalServicegroups = payload.servicegroups || [];
-                
+
+                // If activeSettings appears empty the initial getSettings() call may have
+                // resolved before the Stream Deck WebSocket delivered the persisted settings.
+                // Retry now that the connection is confirmed active.
+                if (!activeSettings.entityType && !activeSettings.hostName && !activeSettings.servicegroup) {
+                    try {
+                        const freshSettings = await streamDeckClient.getSettings();
+                        if (freshSettings && Object.keys(freshSettings).length > 0) {
+                            activeSettings = freshSettings;
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+
                 if (payload.credentials) {
                     urlInput.value = payload.credentials.url || '';
                     usernameInput.value = payload.credentials.username || '';
                     passwordInput.value = payload.credentials.password || '';
-                    
+
                     if (!activeSettings.url) {
-                        updateActionSettings({
+                        await updateActionSettings({
                             url: payload.credentials.url,
                             username: payload.credentials.username,
                             password: payload.credentials.password
                         });
                     }
                 }
-                
+
                 setupSettingsForm();
                 showView('settings');
             } 
@@ -370,7 +382,9 @@
                 username: '',
                 password: '',
                 hostName: '',
-                serviceName: ''
+                serviceName: '',
+                hostgroup: '',
+                servicegroup: ''
             });
             showView('login');
         });
@@ -475,12 +489,14 @@
             toggleFields();
             const type = entityTypeSelect.value;
             const isTotals = type === 'host_totals' || type === 'service_totals';
+            const warnVal = parseFloat(warnThresholdInput.value);
+            const critVal = parseFloat(critThresholdInput.value);
             await updateActionSettings({
                 entityType: type,
                 serviceName: type === 'service' ? serviceSelect.value : '',
                 hostName: (type === 'host' || type === 'service') ? hostSelect.value : '',
-                warnThreshold: parseFloat(warnThresholdInput.value) || 99.0,
-                critThreshold: parseFloat(critThresholdInput.value) || 98.0,
+                warnThreshold: Number.isFinite(warnVal) ? warnVal : 99.0,
+                critThreshold: Number.isFinite(critVal) ? critVal : 98.0,
                 hostgroup: isTotals ? hostgroupSelect.value : '',
                 servicegroup: isTotals ? servicegroupSelect.value : ''
             });
@@ -501,14 +517,16 @@
         });
 
         warnThresholdInput.addEventListener('change', async () => {
+            const val = parseFloat(warnThresholdInput.value);
             await updateActionSettings({
-                warnThreshold: parseFloat(warnThresholdInput.value) || 99.0
+                warnThreshold: Number.isFinite(val) ? val : 99.0
             });
         });
 
         critThresholdInput.addEventListener('change', async () => {
+            const val = parseFloat(critThresholdInput.value);
             await updateActionSettings({
-                critThreshold: parseFloat(critThresholdInput.value) || 98.0
+                critThreshold: Number.isFinite(val) ? val : 98.0
             });
         });
 
