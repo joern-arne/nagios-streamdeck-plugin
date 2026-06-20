@@ -244,7 +244,7 @@
         }
 
         // Initialize connection status when SD is ready
-        streamDeckClient.sendToPropertyInspector.subscribe((event) => {
+        streamDeckClient.sendToPropertyInspector.subscribe(async (event) => {
             const payload = (event && event.payload) ? event.payload : event;
             if (!payload || !payload.event) return;
 
