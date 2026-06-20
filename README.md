@@ -4,6 +4,8 @@
 
 Bring Nagios Core monitoring straight to your fingertips. This Stream Deck plugin displays real-time host and service statuses, calculated overall availability, and group-level telemetry directly on your keys.
 
+> **Marketplace status**: The plugin has been submitted to Elgato and is currently awaiting initial approval based on v0.1.0. Once approved, a v1.0 release will be published on the marketplace based on the latest v0.x version available at that time.
+
 ---
 
 ## 🔗 Quick Links
