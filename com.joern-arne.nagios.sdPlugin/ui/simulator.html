@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Nagios Stream Deck Plugin Simulator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0d1117;
+      --panel-dark: #161b22;
+      --border-color: #30363d;
+      --text-main: #c9d1d9;
+      --text-muted: #8b949e;
+      --accent: #2ecc71;
+      --accent-glow: rgba(46, 204, 113, 0.4);
+      --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: row;
+      background: radial-gradient(circle at 10% 20%, rgba(20, 30, 25, 0.8) 0%, rgba(13, 17, 23, 0.95) 90%);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      width: 900px;
+      height: 580px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.05);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Left Side: Simulated Device */
+    .device-area {
+      flex: 1.1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border-right: 1px solid var(--border-color);
+      background-color: rgba(0, 0, 0, 0.2);
+      padding: 40px;
+      position: relative;
+    }
+
+    .device-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: #ffffff;
+      margin-bottom: 25px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      text-align: center;
+      background: linear-gradient(90deg, #58a6ff, #2ecc71);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .deck-frame {
+      background: linear-gradient(135deg, #2d3139 0%, #1a1c23 100%);
+      padding: 24px;
+      border-radius: 24px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7), 
+                  0 0 1px 2px rgba(255, 255, 255, 0.08) inset,
+                  0 4px 6px rgba(0, 0, 0, 0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1.5px solid #3c4452;
+    }
+
+    .deck-key-slot {
+      background: #0f1015;
+      width: 148px;
+      height: 148px;
+      border-radius: 22px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8) inset;
+      padding: 2px;
+    }
+
+    .deck-key {
+      width: 144px;
+      height: 144px;
+      border-radius: 20px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .deck-key:active {
+      transform: scale(0.96) translate(0px, 2px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Gloss reflection overlay */
+    .deck-key::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.05) 100%);
+      pointer-events: none;
+      z-index: 10;
+      border-radius: 20px;
+    }
+
+    .key-image {
+      width: 144px;
+      height: 144px;
+      display: block;
+    }
+
+    .device-info {
+      margin-top: 25px;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-align: center;
+      line-height: 1.5;
+      max-width: 260px;
+    }
+
+    /* Right Side: Settings UI */
+    .settings-area {
+      flex: 1.3;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background-color: var(--panel-dark);
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 15px;
+      margin-bottom: 20px;
+    }
+
+    .panel-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 20px;
+      color: #ffffff;
+      margin: 0 0 5px 0;
+    }
+
+    .panel-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .setup-group {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .form-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-main);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .form-input, .form-select {
+      background-color: var(--bg-dark);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: #ffffff;
+      font-family: var(--font-family);
+      font-size: 13px;
+      padding: 8px 12px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-input:focus, .form-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.15);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 5px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .checkbox-item input {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+
+    .checkbox-label {
+      font-size: 12px;
+      color: var(--text-main);
+    }
+
+    .btn-connect {
+      background-color: var(--accent);
+      color: #0b0f0a;
+      border: none;
+      border-radius: 6px;
+      font-family: var(--font-family);
+      font-weight: 700;
+      font-size: 13px;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .btn-connect:hover {
+      background-color: #27ae60;
+    }
+
+    .btn-connect:active {
+      transform: scale(0.98);
+    }
+
+    .server-status-bar {
+      background-color: #21262d;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .btn-disconnect {
+      background-color: transparent;
+      border: 1px solid #f85149;
+      color: #f85149;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .btn-disconnect:hover {
+      background-color: #f85149;
+      color: #ffffff;
+    }
+
+    .loading-overlay {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      height: 250px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .footer {
+      border-top: 1px solid var(--border-color);
+      padding-top: 15px;
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-logo {
+      width: 14px;
+      height: 14px;
+      fill: var(--accent);
+    }
+
+    .elgato-logo {
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- Left: Simulated Stream Deck Key -->
+    <div class="device-area">
+      <div class="device-title">
+        <svg class="brand-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+          <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <line x1="12" y1="2" x2="12" y2="4" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="12" y1="20" x2="12" y2="22" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="2" y1="12" x2="4" y2="12" stroke="currentColor" stroke-width="1.5"/>
+          <line x1="20" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Nagios Key Active
+      </div>
+      
+      <div class="deck-frame">
+        <div class="deck-key-slot">
+          <div class="deck-key" id="deck-key" onclick="simulateKeyPress()">
+            <!-- SVG content is injected dynamically here -->
+            <div id="key-content-container" style="width: 144px; height: 144px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="device-info" id="device-info">
+        Press key to instantly open the Nagios details page in your default browser.
+      </div>
+    </div>
+
+    <!-- Right: Configuration Panel -->
+    <div class="settings-area">
+      
+      <div>
+        <div class="panel-header">
+          <h2 class="panel-title">Status Monitor</h2>
+          <p class="panel-subtitle">Displays Nagios host or service status on button keys.</p>
+        </div>
+
+        <!-- Connection Screen -->
+        <div id="view-connect" style="display: block;">
+          <div class="setup-group">
+            <div class="form-item">
+              <label class="form-label" for="sim-url">Nagios Base URL</label>
+              <input class="form-input" type="text" id="sim-url" value="https://nagios.example.com/nagios">
+            </div>
+            
+            <div class="form-row">
+              <div class="form-item">
+                <label class="form-label" for="sim-user">Username</label>
+                <input class="form-input" type="text" id="sim-user" value="nagiosadmin">
+              </div>
+              <div class="form-item">
+                <label class="form-label" for="sim-pass">Password</label>
+                <input class="form-input" type="password" id="sim-pass" value="••••••••">
+              </div>
+            </div>
+            
+            <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+              <button class="btn-connect" onclick="connectToServer()">Connect to Server</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading Screen -->
+        <div id="view-loading" style="display: none;">
+          <div class="loading-overlay">
+            <div class="spinner"></div>
+            <div style="font-weight: 500; font-size: 14px;" id="loading-message">Verifying credentials and fetching entities...</div>
+          </div>
+        </div>
+
+        <!-- Main Configuration Screen -->
+        <div id="view-config" style="display: none;">
+          <div class="server-status-bar">
+            <div class="status-indicator">
+              <div class="indicator-dot"></div>
+              <span id="connected-server">nagios.example.com</span>
+            </div>
+            <button class="btn-disconnect" onclick="disconnectServer()">Disconnect</button>
+          </div>
+
+          <div class="setup-group">
+            <div class="form-row">
+              <div class="form-item">
+                <label class="form-label" for="sim-type">Monitor Type</label>
+                <select class="form-select" id="sim-type" onchange="onTypeChange()">
+                  <option value="host">Host Status</option>
+                  <option value="service" selected>Service Status</option>
+                  <option value="host_totals">Host Totals Overview</option>
+                  <option value="service_totals">Service Totals Overview</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label class="form-label" for="sim-interval">Poll Interval</label>
+                <select class="form-select" id="sim-interval" onchange="updateButtonDisplay()">
+                  <option value="10">10 seconds</option>
+                  <option value="30" selected>30 seconds</option>
+                  <option value="60">1 minute</option>
+                  <option value="300">5 minutes</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Host Select (conditional) -->
+            <div class="form-item" id="row-host">
+              <label class="form-label" for="sim-host">Host Name</label>
+              <select class="form-select" id="sim-host" onchange="onHostChange()">
+                <option value="db-server-primary">db-server-primary</option>
+                <option value="web-server-01">web-server-01</option>
+                <option value="api-gateway">api-gateway</option>
+                <option value="nagios-core">nagios-core</option>
+              </select>
+            </div>
+
+            <!-- Service Select (conditional) -->
+            <div class="form-item" id="row-service">
+              <label class="form-label" for="sim-service">Service Name</label>
+              <select class="form-select" id="sim-service" onchange="updateButtonDisplay()">
+                <!-- services are populated dynamically in JS -->
+              </select>
+            </div>
+
+            <!-- Hostgroup/Servicegroup (conditional totals) -->
+            <div class="form-row" id="row-groups" style="display: none;">
+              <div class="form-item" id="item-hostgroup">
+                <label class="form-label" for="sim-hostgroup">Hostgroup Filter</label>
+                <select class="form-select" id="sim-hostgroup" onchange="onGroupChange('hostgroup')">
+                  <option value="">-- All Hostgroups --</option>
+                  <option value="linux-servers">linux-servers</option>
+                  <option value="database-cluster">database-cluster</option>
+                  <option value="production-apis">production-apis</option>
+                </select>
+              </div>
+              <div class="form-item" id="item-servicegroup">
+                <label class="form-label" for="sim-servicegroup">Servicegroup Filter</label>
+                <select class="form-select" id="sim-servicegroup" onchange="onGroupChange('servicegroup')">
+                  <option value="">-- All Servicegroups --</option>
+                  <option value="web-services">web-services</option>
+                  <option value="database-checks">database-checks</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Warning and Critical Thresholds (conditional totals) -->
+            <div class="form-row" id="row-thresholds" style="display: none;">
+              <div class="form-item">
+                <label class="form-label" for="sim-warn">Warning Threshold (%)</label>
+                <input class="form-input" type="number" id="sim-warn" min="0" max="100" step="0.1" value="99.0" oninput="updateButtonDisplay()">
+              </div>
+              <div class="form-item">
+                <label class="form-label" for="sim-crit">Critical Threshold (%)</label>
+                <input class="form-input" type="number" id="sim-crit" min="0" max="100" step="0.1" value="98.0" oninput="updateButtonDisplay()">
+              </div>
+            </div>
+
+            <!-- Graph and Duration -->
+            <div class="form-row">
+              <div class="form-item" style="justify-content: center;">
+                <label class="checkbox-item">
+                  <input type="checkbox" id="sim-graph" checked onchange="onGraphChange()">
+                  <span class="checkbox-label">Show history status graph</span>
+                </label>
+              </div>
+              <div class="form-item" id="item-duration">
+                <label class="form-label" for="sim-duration">Graph Timeframe</label>
+                <select class="form-select" id="sim-duration" onchange="updateButtonDisplay()">
+                  <option value="15">15 minutes</option>
+                  <option value="60" selected>1 hour</option>
+                  <option value="360">6 hours</option>
+                  <option value="1440">24 hours</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer / Logo area -->
+      <div class="footer">
+        <div class="brand-group">
+          <svg class="brand-logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+            <circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <circle cx="12" cy="12" r="2" fill="currentColor"/>
+            <line x1="12" y1="2" x2="12" y2="4" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="12" y1="20" x2="12" y2="22" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="2" y1="12" x2="4" y2="12" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="20" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span class="elgato-logo">NAGIOS STATUS</span>
+        </div>
+        <span>v0.2.5.1</span>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Mock Data Store
+    const servicesMap = {
+      "db-server-primary": [
+        { name: "CPU Load", status: "OK", value: 2, lastChange: 172800 }, // 48h
+        { name: "Memory Free", status: "OK", value: 2, lastChange: 86400 },
+        { name: "MariaDB Process", status: "OK", value: 2, lastChange: 604800 },
+        { name: "Backup Status", status: "WARNING", value: 4, lastChange: 1800 }, // 30m
+        { name: "Disk Space /var", status: "CRITICAL", value: 16, lastChange: 600 } // 10m
+      ],
+      "web-server-01": [
+        { name: "HTTP Port 80", status: "OK", value: 2, lastChange: 345600 },
+        { name: "HTTPS Certificate", status: "OK", value: 2, lastChange: 1209600 },
+        { name: "Nginx Service", status: "OK", value: 2, lastChange: 345600 },
+        { name: "CPU Load", status: "WARNING", value: 4, lastChange: 900 }
+      ],
+      "api-gateway": [
+        { name: "HTTP Gateway Response", status: "OK", value: 2, lastChange: 518400 },
+        { name: "SSL Certificate", status: "OK", value: 2, lastChange: 1555200 },
+        { name: "Redis Cache Status", status: "CRITICAL", value: 16, lastChange: 150 }
+      ],
+      "nagios-core": [
+        { name: "Nagios Process Check", status: "OK", value: 2, lastChange: 2592000 },
+        { name: "CGI Response Times", status: "OK", value: 2, lastChange: 2592000 }
+      ]
+    };
+
+    const hostStatusMap = {
+      "db-server-primary": { status: "UP", value: 2, lastChange: 604800 },
+      "web-server-01": { status: "UP", value: 2, lastChange: 345600 },
+      "api-gateway": { status: "UP", value: 2, lastChange: 518400 },
+      "nagios-core": { status: "UP", value: 2, lastChange: 2592000 }
+    };
+
+    // Initial load: Draw Setup state on the key
+    window.onload = function() {
+      drawConfigureState();
+      populateServicesDropdown();
+    };
+
+    // View navigation
+    function connectToServer() {
+      document.getElementById('view-connect').style.display = 'none';
+      document.getElementById('view-loading').style.display = 'block';
+      
+      setTimeout(() => {
+        document.getElementById('view-loading').style.display = 'none';
+        document.getElementById('view-config').style.display = 'block';
+        updateButtonDisplay();
+      }, 1500); // 1.5s delay to show connecting state
+    }
+
+    function disconnectServer() {
+      document.getElementById('view-config').style.display = 'none';
+      document.getElementById('view-connect').style.display = 'block';
+      drawConfigureState();
+    }
+
+    // Dynamic dropdown management
+    function populateServicesDropdown() {
+      const selectedHost = document.getElementById('sim-host').value;
+      const serviceSelect = document.getElementById('sim-service');
+      serviceSelect.innerHTML = "";
+      
+      const services = servicesMap[selectedHost] || [];
+      services.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.name;
+        opt.textContent = `${s.name} (${s.status})`;
+        serviceSelect.appendChild(opt);
+      });
+    }
+
+    function onHostChange() {
+      populateServicesDropdown();
+      updateButtonDisplay();
+    }
+
+    function onTypeChange() {
+      const type = document.getElementById('sim-type').value;
+      
+      document.getElementById('row-host').style.display = (type === 'host' || type === 'service') ? 'block' : 'none';
+      document.getElementById('row-service').style.display = (type === 'service') ? 'block' : 'none';
+      document.getElementById('row-groups').style.display = (type === 'host_totals' || type === 'service_totals') ? 'grid' : 'none';
+      document.getElementById('row-thresholds').style.display = (type === 'host_totals' || type === 'service_totals') ? 'grid' : 'none';
+      
+      // Toggle Group Filter items
+      document.getElementById('item-servicegroup').style.display = (type === 'service_totals') ? 'block' : 'none';
+
+      updateButtonDisplay();
+    }
+
+    function onGroupChange(changedType) {
+      if (changedType === 'hostgroup') {
+        const val = document.getElementById('sim-hostgroup').value;
+        if (val) document.getElementById('sim-servicegroup').value = "";
+      } else {
+        const val = document.getElementById('sim-servicegroup').value;
+        if (val) document.getElementById('sim-hostgroup').value = "";
+      }
+      updateButtonDisplay();
+    }
+
+    function onGraphChange() {
+      const showGraph = document.getElementById('sim-graph').checked;
+      document.getElementById('item-duration').style.display = showGraph ? 'block' : 'none';
+      updateButtonDisplay();
+    }
+
+    // Key press simulator handler
+    function simulateKeyPress() {
+      const type = document.getElementById('sim-type').value;
+      const host = document.getElementById('sim-host').value;
+      const service = document.getElementById('sim-service').value;
+      
+      let target = "";
+      if (type === 'host') {
+        target = `extinfo.cgi?type=1&host=${host}`;
+      } else if (type === 'service') {
+        target = `extinfo.cgi?type=2&host=${host}&service=${service}`;
+      } else if (type === 'host_totals') {
+        const hg = document.getElementById('sim-hostgroup').value;
+        target = hg ? `status.cgi?hostgroup=${hg}&style=hostdetail` : `status.cgi?host=all&style=hostdetail`;
+      } else if (type === 'service_totals') {
+        const sg = document.getElementById('sim-servicegroup').value;
+        const hg = document.getElementById('sim-hostgroup').value;
+        if (sg) target = `status.cgi?servicegroup=${sg}`;
+        else if (hg) target = `status.cgi?hostgroup=${hg}`;
+        else target = `status.cgi?host=all`;
+      }
+
+      const infoBox = document.getElementById('device-info');
+      infoBox.style.color = '#ffffff';
+      infoBox.innerHTML = `<strong>Action Event triggered!</strong> Opening detail page:<br><span style="color:#58a6ff; font-family:monospace;">/cgi-bin/${target}</span>`;
+      
+      setTimeout(() => {
+        infoBox.style.color = 'var(--text-muted)';
+        infoBox.textContent = 'Press key to instantly open the Nagios details page in your default browser.';
+      }, 3000);
+    }
+
+    // Dynamic SVG renderer matching the production TS logic
+    function updateButtonDisplay() {
+      const type = document.getElementById('sim-type').value;
+      const showGraph = document.getElementById('sim-graph').checked;
+      
+      let svg = "";
+
+      if (type === 'host') {
+        const host = document.getElementById('sim-host').value;
+        const statusData = hostStatusMap[host] || { status: "UP", value: 2, lastChange: 86400 };
+        
+        let startColor = "#0A5C2C", endColor = "#1DA853"; // Green (UP)
+        if (statusData.status === "DOWN") {
+          startColor = "#7C1010"; endColor = "#E53E3E"; // Red
+        }
+
+        const label = host.length > 15 ? host.substring(0, 12) + "..." : host;
+        const durationStr = formatDurationString(statusData.lastChange);
+        const graphPath = showGraph ? getMockGraphPath() : "";
+
+        svg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+            <defs>
+              <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${startColor}" />
+                <stop offset="100%" stop-color="${endColor}" />
+              </linearGradient>
+            </defs>
+            <rect width="144" height="144" rx="20" fill="url(#bgGrad)" />
+            ${graphPath}
+            <rect width="144" height="72" rx="20" fill="white" fill-opacity="0.08" />
+            
+            <text x="72" y="32" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${label}</text>
+            <text x="72" y="76" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1">${statusData.status}</text>
+            
+            <rect x="22" y="98" width="100" height="20" rx="10" fill="black" fill-opacity="0.25" />
+            <text x="72" y="112" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.95">${durationStr}</text>
+          </svg>
+        `;
+      } 
+      
+      else if (type === 'service') {
+        const host = document.getElementById('sim-host').value;
+        const serviceName = document.getElementById('sim-service').value;
+        const services = servicesMap[host] || [];
+        const sData = services.find(s => s.name === serviceName) || { name: serviceName, status: "OK", value: 2, lastChange: 86400 };
+
+        let startColor = "#0A5C2C", endColor = "#1DA853"; // Green (OK)
+        if (sData.status === "WARNING") {
+          startColor = "#9F5A00"; endColor = "#D69E2E"; // Yellow
+        } else if (sData.status === "CRITICAL") {
+          startColor = "#7C1010"; endColor = "#E53E3E"; // Red
+        }
+
+        let textSvg = "";
+        const parts = sData.name.split(" - ");
+        if (parts.length > 1) {
+          const trunc1 = parts[0].length > 15 ? parts[0].substring(0, 12) + "..." : parts[0];
+          const trunc2 = parts[1].length > 15 ? parts[1].substring(0, 12) + "..." : parts[1];
+          textSvg = `
+            <text x="72" y="21" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc1}</text>
+            <text x="72" y="33" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="10" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc2}</text>
+          `;
+        } else {
+          const trunc = sData.name.length > 15 ? sData.name.substring(0, 12) + "..." : sData.name;
+          textSvg = `
+            <text x="72" y="32" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc}</text>
+          `;
+        }
+
+        const durationStr = formatDurationString(sData.lastChange);
+        const graphPath = showGraph ? getMockGraphPath(sData.status) : "";
+
+        svg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+            <defs>
+              <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${startColor}" />
+                <stop offset="100%" stop-color="${endColor}" />
+              </linearGradient>
+            </defs>
+            <rect width="144" height="144" rx="20" fill="url(#bgGrad)" />
+            ${graphPath}
+            <rect width="144" height="72" rx="20" fill="white" fill-opacity="0.08" />
+            
+            ${textSvg}
+            <text x="72" y="76" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1">${sData.status.substring(0, 4)}</text>
+            
+            <rect x="22" y="98" width="100" height="20" rx="10" fill="black" fill-opacity="0.25" />
+            <text x="72" y="112" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.95">${durationStr}</text>
+          </svg>
+        `;
+      } 
+      
+      else if (type === 'host_totals' || type === 'service_totals') {
+        const isHost = (type === 'host_totals');
+        const hg = document.getElementById('sim-hostgroup').value;
+        const sg = document.getElementById('sim-servicegroup').value;
+        
+        let titleLabel = isHost ? "HOST TOTALS" : "SERVICE TOTALS";
+        if (isHost && hg) titleLabel = hg.toUpperCase();
+        if (!isHost && sg) titleLabel = sg.toUpperCase();
+        if (!isHost && !sg && hg) titleLabel = hg.toUpperCase();
+
+        // compute availability based on filter
+        let avail = 100.0, okCount = 145, allCount = 146;
+        if (isHost) {
+          if (hg === 'linux-servers') { avail = 100.0; okCount = 12; allCount = 12; }
+          else if (hg === 'database-cluster') { avail = 97.2; okCount = 35; allCount = 36; }
+          else { avail = 99.3; okCount = 145; allCount = 146; }
+        } else {
+          if (sg === 'web-services') { avail = 100.0; okCount = 42; allCount = 42; }
+          else if (sg === 'database-checks') { avail = 96.1; okCount = 98; allCount = 102; }
+          else if (hg === 'database-cluster') { avail = 97.2; okCount = 35; allCount = 36; }
+          else { avail = 99.5; okCount = 961; allCount = 965; }
+        }
+
+        const warn = parseFloat(document.getElementById('sim-warn').value) || 99.0;
+        const crit = parseFloat(document.getElementById('sim-crit').value) || 98.0;
+
+        let startColor = "#0A5C2C", endColor = "#1DA853"; // Green
+        if (avail < crit) {
+          startColor = "#7C1010"; endColor = "#E53E3E"; // Red
+        } else if (avail < warn) {
+          startColor = "#9F5A00"; endColor = "#D69E2E"; // Yellow
+        }
+
+        const availStr = avail.toFixed(1) + "%";
+        const countLabel = isHost ? `UP: ${okCount}/${allCount}` : `OK: ${okCount}/${allCount}`;
+        
+        let part1 = titleLabel, part2 = "";
+        if (titleLabel.includes("-")) {
+          const parts = titleLabel.split("-");
+          part1 = parts[0]; part2 = parts.slice(1).join("-");
+        } else if (titleLabel.includes(" ")) {
+          const parts = titleLabel.split(" ");
+          part1 = parts[0]; part2 = parts.slice(1).join(" ");
+        }
+
+        const trunc1 = part1.length > 14 ? part1.substring(0, 11) + "..." : part1;
+        const trunc2 = part2.length > 14 ? part2.substring(0, 11) + "..." : part2;
+
+        let textSvg = "";
+        if (part2) {
+          textSvg = `
+            <text x="72" y="22" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc1}</text>
+            <text x="72" y="36" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc2}</text>
+          `;
+        } else {
+          textSvg = `
+            <text x="72" y="32" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">${trunc1}</text>
+          `;
+        }
+
+        const graphPath = showGraph ? getMockGraphPath(avail < crit ? "CRITICAL" : (avail < warn ? "WARNING" : "OK")) : "";
+
+        svg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+            <defs>
+              <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="${startColor}" />
+                <stop offset="100%" stop-color="${endColor}" />
+              </linearGradient>
+            </defs>
+            <rect width="144" height="144" rx="20" fill="url(#bgGrad)" />
+            ${graphPath}
+            <rect width="144" height="72" rx="20" fill="white" fill-opacity="0.08" />
+            
+            ${textSvg}
+            <text x="72" y="76" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="20" font-weight="900" fill="#ffffff" text-anchor="middle">${availStr}</text>
+            
+            <rect x="14" y="96" width="116" height="24" rx="12" fill="black" fill-opacity="0.25" />
+            <text x="72" y="113" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.95">${countLabel}</text>
+          </svg>
+        `;
+      }
+
+      document.getElementById('key-content-container').innerHTML = svg.trim();
+    }
+
+    function drawConfigureState() {
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144">
+          <defs>
+            <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#2d3748" />
+              <stop offset="100%" stop-color="#4a5568" />
+            </linearGradient>
+          </defs>
+          <rect width="144" height="144" rx="20" fill="url(#bgGrad)" />
+          <text x="72" y="55" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.8">NAGIOS</text>
+          <rect x="22" y="75" width="100" height="24" rx="12" fill="black" fill-opacity="0.2" />
+          <text x="72" y="91" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.95">Setup UI</text>
+        </svg>
+      `;
+      document.getElementById('key-content-container').innerHTML = svg.trim();
+    }
+
+    function formatDurationString(sec) {
+      const days = Math.floor(sec / 86400);
+      sec %= 86400;
+      const hours = Math.floor(sec / 3600);
+      sec %= 3600;
+      const minutes = Math.floor(sec / 60);
+      const seconds = sec % 60;
+      
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      if (minutes > 0) return `${minutes}m ${seconds}s`;
+      return `${seconds}s`;
+    }
+
+    function getMockGraphPath(status = "OK") {
+      let points = [];
+      if (status === "OK") {
+        points = [
+          { x: 0, y: 130 }, { x: 20, y: 128 }, { x: 40, y: 132 }, 
+          { x: 60, y: 131 }, { x: 80, y: 129 }, { x: 100, y: 130 }, 
+          { x: 120, y: 132 }, { x: 144, y: 130 }
+        ];
+      } else if (status === "WARNING") {
+        points = [
+          { x: 0, y: 130 }, { x: 20, y: 128 }, { x: 40, y: 132 }, 
+          { x: 65, y: 80 }, { x: 80, y: 82 }, { x: 100, y: 85 }, 
+          { x: 120, y: 95 }, { x: 144, y: 92 }
+        ];
+      } else { // CRITICAL
+        points = [
+          { x: 0, y: 130 }, { x: 20, y: 128 }, { x: 40, y: 60 }, 
+          { x: 55, y: 42 }, { x: 75, y: 45 }, { x: 100, y: 48 }, 
+          { x: 120, y: 46 }, { x: 144, y: 44 }
+        ];
+      }
+
+      let pathD = `M 0,144`;
+      points.forEach(pt => {
+        pathD += ` L ${pt.x},${pt.y}`;
+      });
+      pathD += ` L 144,144 Z`;
+
+      let lineD = `M ${points[0].x},${points[0].y}`;
+      for (let i = 1; i < points.length; i++) {
+        lineD += ` L ${points[i].x},${points[i].y}`;
+      }
+
+      return `
+        <path d="${pathD}" fill="white" fill-opacity="0.12" />
+        <path d="${lineD}" fill="none" stroke="white" stroke-opacity="0.35" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+      `;
+    }
+  </script>
+</body>
+</html>

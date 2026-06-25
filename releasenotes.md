@@ -2,6 +2,15 @@
 
 This document outlines the changes, new features, and bug fixes for each version of the Nagios Stream Deck Plugin.
 
+## [v0.2.5.1] - 2026-06-25
+
+### Added
+- **Interactive Simulator**: Created a high-fidelity plugin settings and key simulator `simulator.html` to run the plugin configuration panel directly in any browser for testing and validation.
+- **Walkthrough Demonstration Recording**: Generated a full animated walkthrough demo (`nagios_plugin_demo.webp`) showing all key features, available in the repository root.
+
+### Changed
+- **Sleek SVG Branding Icons**: Replaced default/generic template category and action PNG icons with custom SVG vector icons, matching Elgato's monochromatic transparent white stroke guidelines (Category: `category-icon.svg`, Action: `icon.svg`, default key: `key.svg`). Deleted all conflicting legacy PNG files.
+
 ---
 
 ## [v0.2.5] - 2026-06-20

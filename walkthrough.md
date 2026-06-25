@@ -65,9 +65,16 @@ Result: `✔ Validation successful` (0 errors, 0 warnings).
 ## Packaging & Distribution
 
 ### 1. App Icon Assets
-We created a modern, high-contrast, glowing neon green crosshair icon representing Nagios monitoring in a sleek Stream Deck key, formatted at the required resolutions:
-- [marketplace.png](com.joern-arne.nagios.sdPlugin/imgs/plugin/marketplace.png) (288x288 pixels)
-- [marketplace@2x.png](com.joern-arne.nagios.sdPlugin/imgs/plugin/marketplace@2x.png) (576x576 pixels)
+We created high-quality, scalable SVG and PNG branding assets that conform strictly to Elgato guidelines (monochromatic white strokes with transparent backgrounds for action list UI, and high-resolution icons for marketplace representation):
+- **Plugin Marketplace Icon:**
+  - [marketplace.png](com.joern-arne.nagios.sdPlugin/imgs/plugin/marketplace.png) (288x288 px)
+  - [marketplace@2x.png](com.joern-arne.nagios.sdPlugin/imgs/plugin/marketplace@2x.png) (576x576 px)
+- **Plugin Category Icon:**
+  - [category-icon.svg](com.joern-arne.nagios.sdPlugin/imgs/plugin/category-icon.svg) (scalable monochromatic white stroke target icon replacing the default template icon)
+- **Plugin Action Icon:**
+  - [icon.svg](com.joern-arne.nagios.sdPlugin/imgs/actions/status/icon.svg) (scalable monochromatic white stroke radar icon replacing the default action list icon)
+- **Default State Key Icon:**
+  - [key.svg](com.joern-arne.nagios.sdPlugin/imgs/actions/status/key.svg) (glowing green circular radar grid and status pulse that serves as the default state on the Stream Deck button keys)
 
 ### 2. Marketplace Listing Assets
 We generated professional, high-resolution screenshots and marketing graphics showing example button values, saved to the `marketing/` folder:
@@ -147,3 +154,14 @@ make watch  # Or: npm run watch
    - Click **Connect**.
 5. Once connected, select whether you want to monitor a **Host** or **Service**, or show **Host Totals** / **Service Totals**.
 6. The button on your Stream Deck device will instantly update to show the status, availability, and color (green for UP/OK, yellow for Warning, red for Down/Critical, grey for Unreachable/Unknown/Offline).
+
+---
+
+## Interactive Simulator & Demo Walkthrough Video
+
+We created an interactive, high-fidelity simulator representing the configuration options and key rendering logic to allow rapid demonstration and validation:
+- [simulator.html](com.joern-arne.nagios.sdPlugin/ui/simulator.html) - Live interactive configuration panel connected to a simulated Stream Deck key.
+- **Walkthrough Demonstration Video:**
+  - We have generated a comprehensive video walkthrough demonstration saved in the repository root as [nagios_plugin_demo.webp](nagios_plugin_demo.webp).
+  - This video simulates connecting to Nagios Core, selecting hosts and services, changing monitor types (e.g., displaying Warning/Critical colors with history graphs), configuring hostgroups to trigger critical threshold colors, and clicking the simulated Stream Deck button to open Nagios extinfo details.
+  - You can email this [nagios_plugin_demo.webp](nagios_plugin_demo.webp) file (or convert it to a video format of your choice) to `maker@elgato.com` to satisfy the demo review requirements.
