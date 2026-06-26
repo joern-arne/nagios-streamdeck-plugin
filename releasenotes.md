@@ -2,6 +2,20 @@
 
 This document outlines the changes, new features, and bug fixes for each version of the Nagios Stream Deck Plugin.
 
+## [v0.3.0.0] - 2026-06-26
+
+### Added
+- **Default entityType Fallback**: The plugin now defaults to `"host"` when `entityType` is undefined (such as on newly added buttons), preventing the button from being stuck in the gray "Setup UI" state.
+- **Improved Settings Initialization**: The Property Inspector now immediately writes default configuration values (`entityType`, `interval`, `warnThreshold`, etc.) to the settings storage on initial load.
+
+### Fixed
+- **Dropdown refresh on Entity Type change**: Changing the entity type to "Service" now correctly and immediately populates the service dropdown list.
+- **Detailed query crashes fallback**: Added a robust fallback query mechanism for service descriptions containing slash characters `/` (which cause Nagios Core's `statusjson.cgi?query=service` to crash with HTTP 500), retrieving the status from the host's servicelist instead.
+- **Duration normalizations**: Normalized duration timestamp calculation by dynamically identifying and handling 10-digit (seconds) vs 13-digit (milliseconds) Unix timestamps.
+- **Credentials preservation**: Fixed an issue where saving settings in the Property Inspector would overwrite credentials, causing the backend polling to lose authentication details.
+
+---
+
 ## [v0.2.6.0] - 2026-06-25
 
 ### Added
