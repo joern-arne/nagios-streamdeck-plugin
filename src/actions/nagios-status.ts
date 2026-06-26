@@ -89,6 +89,12 @@ function getServicesFromList(servicelist: any): Array<{ hostName?: string; servi
 							last_state_change: item.last_state_change,
 							last_hard_state_change: item.last_hard_state_change
 						});
+					} else {
+						list.push({
+							hostName: hostName,
+							serviceName: serviceName,
+							status: typeof item === "number" ? item : Number(item) || 0
+						});
 					}
 				}
 			}
@@ -121,8 +127,11 @@ function getNormalizedHostStatus(status: number, isStandard: boolean): number {
 }
 
 // Helper to format duration — both arguments are Unix timestamps in seconds (as returned by Nagios statusjson.cgi)
-function formatDuration(lastStateChangeSec: number, queryTimeSec: number): string {
-	if (!lastStateChangeSec || lastStateChangeSec <= 0) return "N/A";
+function formatDuration(lastStateChangeRaw: number, queryTimeRaw: number): string {
+	if (!lastStateChangeRaw || lastStateChangeRaw <= 0) return "N/A";
+
+	const lastStateChangeSec = lastStateChangeRaw > 9999999999 ? Math.floor(lastStateChangeRaw / 1000) : lastStateChangeRaw;
+	const queryTimeSec = queryTimeRaw > 9999999999 ? Math.floor(queryTimeRaw / 1000) : queryTimeRaw;
 
 	let diffSeconds = Math.floor(queryTimeSec - lastStateChangeSec);
 	if (diffSeconds < 0) diffSeconds = 0;
@@ -176,7 +185,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 	/**
 	 * Starts the polling schedule for an action instance.
 	 */
-	private startPolling(action: any, settings: NagiosSettings) {
+	private async startPolling(action: any, settings: NagiosSettings) {
 		const entityKey = this.getEntityKey(settings);
 		if (this.lastEntityKey.get(action.id) !== entityKey) {
 			this.history.delete(action.id);
@@ -185,8 +194,24 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 
 		this.stopPolling(action.id);
 
-		const isTotals = settings.entityType === "host_totals" || settings.entityType === "service_totals";
-		const hasConfig = settings.url && settings.username && settings.password && (isTotals || settings.hostName);
+		let url = settings.url;
+		let username = settings.username;
+		let password = settings.password;
+
+		if (!url || !username || !password) {
+			try {
+				const globalSettings = await streamDeck.settings.getGlobalSettings<any>();
+				url = globalSettings.url;
+				username = globalSettings.username;
+				password = globalSettings.password;
+			} catch (err) {
+				streamDeck.logger.warn("Failed to fetch global settings in startPolling:", err);
+			}
+		}
+
+		const entityType = settings.entityType || "host";
+		const isTotals = entityType === "host_totals" || entityType === "service_totals";
+		const hasConfig = url && username && password && (isTotals || settings.hostName);
 		if (!hasConfig) {
 			// Not configured yet, draw a neutral setup button
 			if (this.visibleActions.has(action.id)) {
@@ -195,13 +220,15 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			return;
 		}
 
+		const config = { ...settings, url, username, password };
+
 		// Run the check immediately
-		this.pollStatus(action, settings);
+		this.pollStatus(action, config);
 
 		// Schedule periodic check
 		const intervalSeconds = settings.interval || 30;
 		const timer = setInterval(() => {
-			this.pollStatus(action, settings);
+			this.pollStatus(action, config);
 		}, intervalSeconds * 1000);
 
 		this.timers.set(action.id, timer);
@@ -211,13 +238,14 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 	 * Queries the Nagios CGI for status.
 	 */
 	private async pollStatus(action: any, settings: NagiosSettings) {
+		const entityType = settings.entityType || "host";
 		try {
 			const cleanUrl = settings.url!.trim().replace(/\/$/, "");
 			let queryUrl = "";
 
-			if (settings.entityType === "host") {
+			if (entityType === "host") {
 				queryUrl = `${cleanUrl}/cgi-bin/statusjson.cgi?query=host&hostname=${encodeURIComponent(settings.hostName!)}`;
-			} else if (settings.entityType === "service") {
+			} else if (entityType === "service") {
 				if (!settings.serviceName) {
 					if (this.visibleActions.has(action.id)) {
 						this.drawConfigureState(action);
@@ -225,7 +253,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					return;
 				}
 				queryUrl = `${cleanUrl}/cgi-bin/statusjson.cgi?query=service&hostname=${encodeURIComponent(settings.hostName!)}&servicedescription=${encodeURIComponent(settings.serviceName)}`;
-			} else if (settings.entityType === "host_totals") {
+			} else if (entityType === "host_totals") {
 				if (settings.hostgroup) {
 					const response = await fetch(`${cleanUrl}/cgi-bin/statusjson.cgi?query=hostcount&hostgroup=${encodeURIComponent(settings.hostgroup)}`, {
 						headers: getHeaders(settings),
@@ -277,7 +305,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 					await this.drawTotalsButton(action, "HOST TOTALS", avail, up, all, settings);
 				}
 				return;
-			} else if (settings.entityType === "service_totals") {
+			} else if (entityType === "service_totals") {
 				if (settings.servicegroup || settings.hostgroup) {
 					const groupParam = settings.servicegroup ? `servicegroup=${encodeURIComponent(settings.servicegroup)}` : `hostgroup=${encodeURIComponent(settings.hostgroup!)}`;
 					const response = await fetch(`${cleanUrl}/cgi-bin/statusjson.cgi?query=servicecount&${groupParam}`, {
@@ -336,44 +364,73 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 				return;
 			}
 
-			const response = await fetch(queryUrl, {
-				headers: getHeaders(settings),
-				signal: AbortSignal.timeout(10000)
-			});
+			let queryTime: number;
+			let status: number;
+			let lastStateChange = 0;
 
-			if (!response.ok) {
-				throw new Error(`HTTP ${response.status}`);
-			}
+			if (entityType === "host") {
+				const response = await fetch(queryUrl, {
+					headers: getHeaders(settings),
+					signal: AbortSignal.timeout(10000)
+				});
 
-			const resJson: any = await response.json();
-			if (resJson.result && resJson.result.type_code !== 0) {
-				throw new Error(resJson.result.message || "Nagios error");
-			}
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}`);
+				}
 
-			const queryTime = resJson.result.query_time;
+				const resJson: any = await response.json();
+				if (resJson.result && resJson.result.type_code !== 0) {
+					throw new Error(resJson.result.message || "Nagios error");
+				}
 
-			if (settings.entityType === "host") {
+				queryTime = resJson.result.query_time;
 				const hostData = resJson.data.host;
 				const rawStatus = hostData.status;
 				const isStandard = rawStatus === 0 || rawStatus === 3;
-				const status = getNormalizedHostStatus(rawStatus, isStandard);
+				status = getNormalizedHostStatus(rawStatus, isStandard);
 				const avail = status === 2 ? 100.0 : 0.0;
 				this.updateHistory(action.id, avail, settings);
-				const lastStateChange = hostData.last_state_change || hostData.last_hard_state_change || 0;
+				lastStateChange = hostData.last_state_change || hostData.last_hard_state_change || 0;
 				if (this.visibleActions.has(action.id)) {
 					await this.drawButton(action, settings.hostName!, "HOST", status, lastStateChange, queryTime, settings);
 				}
-			} else if (settings.entityType === "service") {
-				const serviceData = resJson.data.service;
-				const rawStatus = serviceData.status;
-				const isStandard = rawStatus === 0 || rawStatus === 3;
-				const status = getNormalizedServiceStatus(rawStatus, isStandard);
+			} else if (entityType === "service") {
+				try {
+					const response = await fetch(queryUrl, {
+						headers: getHeaders(settings),
+						signal: AbortSignal.timeout(10000)
+					});
+
+					if (!response.ok) {
+						throw new Error(`HTTP ${response.status}`);
+					}
+
+					const resJson: any = await response.json();
+					if (resJson.result && resJson.result.type_code !== 0) {
+						throw new Error(resJson.result.message || "Nagios error");
+					}
+
+					queryTime = resJson.result.query_time;
+					const serviceData = resJson.data.service;
+					const rawStatus = serviceData.status;
+					const isStandard = rawStatus === 0 || rawStatus === 3;
+					status = getNormalizedServiceStatus(rawStatus, isStandard);
+					lastStateChange = serviceData.last_state_change || serviceData.last_hard_state_change || 0;
+				} catch (err: any) {
+					streamDeck.logger.warn(`Direct service status query failed for "${settings.serviceName}" on "${settings.hostName}". Retrying via fallback servicelist query. Error:`, err);
+					const fallback = await this.fetchServiceStatusFallback(cleanUrl, settings);
+					queryTime = fallback.queryTime;
+					const isStandard = fallback.status === 0 || fallback.status === 3;
+					status = getNormalizedServiceStatus(fallback.status, isStandard);
+					lastStateChange = fallback.lastStateChange;
+				}
+
 				let avail = 0.0;
 				if (status === 2) avail = 100.0;
 				else if (status === 4) avail = 50.0;
 				else avail = 0.0;
 				this.updateHistory(action.id, avail, settings);
-				const lastStateChange = serviceData.last_state_change || serviceData.last_hard_state_change || 0;
+
 				if (this.visibleActions.has(action.id)) {
 					await this.drawButton(action, settings.serviceName!, "SERVICE", status, lastStateChange, queryTime, settings);
 				}
@@ -383,15 +440,58 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			if (this.visibleActions.has(action.id)) {
 				await this.drawErrorState(
 					action,
-					settings.entityType === "host_totals"
+					entityType === "host_totals"
 						? "Host Totals"
-						: settings.entityType === "service_totals"
+						: entityType === "service_totals"
 						? "Service Totals"
 						: settings.hostName || "Nagios",
 					err.message || "Error"
 				);
 			}
 		}
+	}
+
+	/**
+	 * Fallback query using servicelist filter for services that crash direct query=service with HTTP 500.
+	 */
+	private async fetchServiceStatusFallback(cleanUrl: string, settings: NagiosSettings): Promise<{ status: number; lastStateChange: number; queryTime: number }> {
+		const url = `${cleanUrl}/cgi-bin/statusjson.cgi?query=servicelist&hostname=${encodeURIComponent(settings.hostName!)}`;
+		const response = await fetch(url, {
+			headers: getHeaders(settings),
+			signal: AbortSignal.timeout(10000)
+		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP ${response.status}`);
+		}
+
+		const resJson: any = await response.json();
+		if (resJson.result && resJson.result.type_code !== 0) {
+			throw new Error(resJson.result.message || "Nagios error");
+		}
+
+		const queryTime = resJson.result.query_time || Math.floor(Date.now() / 1000);
+		const servicelist = resJson.data.servicelist || {};
+		const hostServices = servicelist[settings.hostName!] || servicelist;
+
+		if (hostServices && typeof hostServices === "object") {
+			const item = hostServices[settings.serviceName!];
+			if (item !== undefined) {
+				let rawStatus = 0;
+				let lastStateChange = 0;
+
+				if (item && typeof item === "object") {
+					rawStatus = item.status !== undefined ? item.status : 0;
+					lastStateChange = item.last_state_change || item.last_hard_state_change || 0;
+				} else {
+					rawStatus = typeof item === "number" ? item : Number(item) || 0;
+				}
+
+				return { status: rawStatus, lastStateChange, queryTime };
+			}
+		}
+
+		throw new Error(`Service "${settings.serviceName}" not found on host "${settings.hostName}"`);
 	}
 
 	/**
@@ -627,7 +727,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 	}
 
 	private getEntityKey(settings: NagiosSettings): string {
-		return `${settings.entityType || ""}:${settings.hostName || ""}:${settings.serviceName || ""}:${settings.hostgroup || ""}:${settings.servicegroup || ""}`;
+		return `${settings.entityType || "host"}:${settings.hostName || ""}:${settings.serviceName || ""}:${settings.hostgroup || ""}:${settings.servicegroup || ""}`;
 	}
 
 	private updateHistory(actionId: string, avail: number, settings: NagiosSettings) {
@@ -711,7 +811,7 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			this.cleanupTimers.delete(ev.action.id);
 		}
 
-		this.startPolling(ev.action, ev.payload.settings);
+		return this.startPolling(ev.action, ev.payload.settings);
 	}
 
 	override onWillDisappear(ev: WillDisappearEvent<NagiosSettings>): void | Promise<void> {
@@ -751,29 +851,30 @@ export class NagiosStatus extends SingletonAction<NagiosSettings> {
 			this.cleanupTimers.delete(ev.action.id);
 		}
 
-		this.startPolling(ev.action, ev.payload.settings);
+		return this.startPolling(ev.action, ev.payload.settings);
 	}
 
 	override async onKeyDown(ev: KeyDownEvent<NagiosSettings>): Promise<void> {
 		const { settings } = ev.payload;
-		const isTotals = settings.entityType === "host_totals" || settings.entityType === "service_totals";
+		const entityType = settings.entityType || "host";
+		const isTotals = entityType === "host_totals" || entityType === "service_totals";
 		if (!settings.url || (!isTotals && !settings.hostName)) return;
 
 		const cleanUrl = settings.url.trim().replace(/\/$/, "");
 		let targetUrl = "";
 
-		if (settings.entityType === "host") {
+		if (entityType === "host") {
 			targetUrl = `${cleanUrl}/cgi-bin/extinfo.cgi?type=1&host=${encodeURIComponent(settings.hostName!)}`;
-		} else if (settings.entityType === "service") {
+		} else if (entityType === "service") {
 			if (!settings.serviceName) return;
 			targetUrl = `${cleanUrl}/cgi-bin/extinfo.cgi?type=2&host=${encodeURIComponent(settings.hostName!)}&service=${encodeURIComponent(settings.serviceName!)}`;
-		} else if (settings.entityType === "host_totals") {
+		} else if (entityType === "host_totals") {
 			if (settings.hostgroup) {
 				targetUrl = `${cleanUrl}/cgi-bin/status.cgi?hostgroup=${encodeURIComponent(settings.hostgroup)}&style=hostdetail`;
 			} else {
 				targetUrl = `${cleanUrl}/cgi-bin/status.cgi?host=all&style=hostdetail`;
 			}
-		} else if (settings.entityType === "service_totals") {
+		} else if (entityType === "service_totals") {
 			if (settings.servicegroup) {
 				targetUrl = `${cleanUrl}/cgi-bin/status.cgi?servicegroup=${encodeURIComponent(settings.servicegroup)}`;
 			} else if (settings.hostgroup) {

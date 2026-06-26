@@ -651,6 +651,10 @@
       // Toggle Group Filter items
       document.getElementById('item-servicegroup').style.display = (type === 'service_totals') ? 'block' : 'none';
 
+      if (type === 'service') {
+        populateServicesDropdown();
+      }
+
       updateButtonDisplay();
     }
 

@@ -1,6 +1,6 @@
 {
 	"Name": "Status Monitor for Nagios",
-	"Version": "0.2.6.0",
+	"Version": "0.2.6.8",
 	"Author": "Joern-Arne",
 	"Actions": [
 		{

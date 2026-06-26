@@ -290,6 +290,7 @@
                     urlInput.value = payload.credentials.url || '';
                     usernameInput.value = payload.credentials.username || '';
                     passwordInput.value = payload.credentials.password || '';
+                    activeSettings = { ...activeSettings, ...payload.credentials };
                 }
 
                 setupSettingsForm();
@@ -380,6 +381,36 @@
             serverLabel.textContent = urlInput.value.replace(/^https?:\/\//, '').split('/')[0];
             serverLabel.title = urlInput.value;
             
+            let updated = false;
+            if (!activeSettings.entityType) {
+                activeSettings.entityType = 'host';
+                updated = true;
+            }
+            if (activeSettings.interval === undefined) {
+                activeSettings.interval = 30;
+                updated = true;
+            }
+            if (activeSettings.warnThreshold === undefined) {
+                activeSettings.warnThreshold = 99.0;
+                updated = true;
+            }
+            if (activeSettings.critThreshold === undefined) {
+                activeSettings.critThreshold = 98.0;
+                updated = true;
+            }
+            if (activeSettings.showGraph === undefined) {
+                activeSettings.showGraph = false;
+                updated = true;
+            }
+            if (activeSettings.graphDuration === undefined) {
+                activeSettings.graphDuration = 60;
+                updated = true;
+            }
+
+            if (updated) {
+                streamDeckClient.setSettings(activeSettings);
+            }
+
             entityTypeSelect.value = activeSettings.entityType || 'host';
             intervalSelect.value = activeSettings.interval || '30';
             warnThresholdInput.value = activeSettings.warnThreshold !== undefined ? activeSettings.warnThreshold : '99.0';
@@ -474,6 +505,9 @@
         entityTypeSelect.addEventListener('change', async () => {
             toggleFields();
             const type = entityTypeSelect.value;
+            if (type === 'service') {
+                populateServices();
+            }
             const isTotals = type === 'host_totals' || type === 'service_totals';
             const warnVal = parseFloat(warnThresholdInput.value);
             const critVal = parseFloat(critThresholdInput.value);
